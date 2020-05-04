@@ -1,7 +1,5 @@
 ///
 /// \file   PedestalsTask.cxx
-/// \author Barthelemy von Haller
-/// \author Piotr Konopka
 /// \author Andrea Ferrero
 ///
 
@@ -21,10 +19,13 @@
 #include "MCHMappingInterface/Segmentation.h"
 #include "MCHMappingInterface/CathodeSegmentation.h"
 #include "MCHRawElecMap/Mapper.h"
-
+#ifdef MCH_HAS_MAPPING_FACTORY
+#include "MCHMappingFactory/CreateSegmentation.h"
+#endif
 //#define QC_MCH_SAVE_TEMP_ROOTFILE
 
 using namespace std;
+using namespace o2::framework;
 
 static FILE* flog = NULL;
 
@@ -61,7 +62,7 @@ namespace quality_control_modules
 {
 namespace muonchambers
 {
-PedestalsTask::PedestalsTask() : TaskInterface(), count(1)
+PedestalsTask::PedestalsTask() : TaskInterface()
 {
   flog = nullptr;
 }
@@ -494,7 +495,7 @@ void PedestalsTask::monitorDataDigits(const o2::framework::DataRef& input)
   if (mPrintLevel >= 1)
     fprintf(flog, "payloadSize: %d\n", (int)header->payloadSize);
   if (mPrintLevel >= 1)
-    fprintf(flog, "payload: %p\n", input.payload);
+    fprintf(flog, "payload: %s\n", input.payload);
 
   std::vector<o2::mch::Digit> digits{ 0 };
   o2::mch::Digit* digitsBuffer = NULL;

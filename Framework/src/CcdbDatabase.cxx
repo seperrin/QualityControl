@@ -33,6 +33,9 @@
 #include <unordered_set>
 
 #include <boost/algorithm/string.hpp>
+#include <boost/property_tree/json_parser.hpp>
+#include <boost/property_tree/ptree.hpp>
+#include <boost/foreach.hpp>
 
 using namespace std::chrono;
 using namespace AliceO2::Common;
@@ -126,87 +129,15 @@ void CcdbDatabase::storeMO(std::shared_ptr<o2::quality_control::core::MonitorObj
   long from = getCurrentTimestamp();
   long to = getFutureTimestamp(60 * 60 * 24 * 365 * 10);
 
-  ccdbApi.storeAsTFile(mo.get(), path, metadata, from, to);
+  // extract object and metadata from MonitorObject
+  TObject* obj = mo->getObject();
+  metadata["qc_detector_name"] = mo->getDetectorName();
+  metadata["qc_task_name"] = mo->getTaskName();
+  metadata["ObjectType"] = mo->getObject()->IsA()->GetName(); // ObjectType says TObject and not MonitorObject due to a quirk in the API. Once fixed, remove this.
+
+  ccdbApi.storeAsTFileAny<TObject>(obj, path, metadata, from, to);
 }
 
-std::shared_ptr<TObject> CcdbDatabase::retrieveTObject(std::string path, long timestamp)
-{
-  map<string, string> metadata;
-  long when = timestamp == 0 ? getCurrentTimestamp() : timestamp;
-
-  // we try first to load a TFile
-  TObject* object = ccdbApi.retrieveFromTFile(path, metadata, when);
-  if (object == nullptr) {
-    // We could not open a TFile we should now try to open an object directly serialized
-    object = ccdbApi.retrieve(path, metadata, when);
-    ILOG(Debug) << "We could retrieve the object " << path << " as a streamed object." << ENDM;
-    if (object == nullptr) {
-      return nullptr;
-    }
-  }
-  std::shared_ptr<TObject> result(object);
-  return result;
-}
-
-std::shared_ptr<core::MonitorObject> CcdbDatabase::retrieveMO(std::string taskName, std::string objectName, long timestamp)
-{
-  string path = taskName + "/" + objectName;
-  std::shared_ptr<TObject> obj = retrieveTObject(path, timestamp);
-  std::shared_ptr<MonitorObject> mo = std::dynamic_pointer_cast<MonitorObject>(obj);
-  if (mo == nullptr) {
-    ILOG(Error) << "Could not cast the object " << taskName << "/" << objectName << " to MonitorObject" << ENDM;
-  }
-  return mo;
-}
-
-std::shared_ptr<QualityObject> CcdbDatabase::retrieveQO(std::string qoPath, long timestamp)
-{
-  std::shared_ptr<TObject> obj = retrieveTObject(qoPath, timestamp);
-  std::shared_ptr<QualityObject> qo = std::dynamic_pointer_cast<QualityObject>(obj);
-  if (qo == nullptr) {
-    LOG(ERROR) << "Could not cast the object " << qoPath << " to QualityObject";
-  }
-  return qo;
-}
-
-std::string CcdbDatabase::retrieveQOJson(std::string qoPath, long timestamp)
-{
-  return retrieveJson(qoPath, timestamp);
-}
-
-std::string CcdbDatabase::retrieveMOJson(std::string taskName, std::string objectName, long timestamp)
-{
-  string path = taskName + "/" + objectName;
-  return retrieveJson(path, timestamp);
-}
-
-std::string CcdbDatabase::retrieveJson(std::string path, long timestamp)
-{
-  auto tobj = retrieveTObject(path, timestamp);
-  if (tobj == nullptr) {
-    return std::string();
-  }
-  TObject* toConvert = 0;
-  if (tobj->IsA() == MonitorObject::Class()) {
-    std::shared_ptr<MonitorObject> mo = std::dynamic_pointer_cast<MonitorObject>(tobj);
-    toConvert = mo->getObject();
-    mo->setIsOwner(true);
-  } else if (tobj->IsA() == QualityObject::Class()) {
-    toConvert = dynamic_cast<QualityObject*>(tobj.get());
-  } else {
-    ILOG(Error) << "Unknown type of object : " << path << " -> " << tobj->ClassName() << ENDM;
-    return std::string();
-  }
-  if (toConvert == nullptr) {
-    ILOG(Error) << "Unable to get the object to convert" << ENDM;
-    return std::string();
-  }
-  TString json = TBufferJSON::ConvertToJSON(toConvert);
-
-  return json.Data();
-}
-
-//Quality Object
 void CcdbDatabase::storeQO(std::shared_ptr<QualityObject> qo)
 {
   // metadata
@@ -214,13 +145,125 @@ void CcdbDatabase::storeQO(std::shared_ptr<QualityObject> qo)
   // QC metadata (prefix qc_)
   metadata["qc_version"] = Version::GetQcVersion().getString();
   metadata["qc_quality"] = std::to_string(qo->getQuality().getLevel());
+  metadata["qc_detector_name"] = qo->getDetectorName();
+  metadata["qc_check_name"] = qo->getCheckName();
+  // user metadata
+  map<string, string> userMetadata = qo->getMetadataMap();
+  if (!userMetadata.empty()) {
+    metadata.insert(userMetadata.begin(), userMetadata.end());
+  }
 
   // other attributes
   string path = qo->getPath();
   long from = getCurrentTimestamp();
   long to = getFutureTimestamp(60 * 60 * 24 * 365 * 10);
 
-  ccdbApi.storeAsTFile(qo.get(), path, metadata, from, to);
+  ccdbApi.storeAsTFileAny<QualityObject>(qo.get(), path, metadata, from, to);
+}
+
+TObject* CcdbDatabase::retrieveTObject(std::string path, std::map<std::string, std::string> const& metadata, long timestamp, std::map<std::string, std::string>* headers)
+{
+  long when = timestamp == 0 ? getCurrentTimestamp() : timestamp;
+
+  // we try first to load a TFile
+  auto* object = ccdbApi.retrieveFromTFileAny<TObject>(path, metadata, when, headers);
+  if (object == nullptr) {
+    // We could not open a TFile we should now try to open an object directly serialized
+    object = ccdbApi.retrieve(path, metadata, when);
+    if (object == nullptr) {
+      ILOG(Error) << "We could NOT retrieve the object " << path << "." << ENDM;
+      return nullptr;
+    }
+  }
+  ILOG(Debug) << "Retrieved object " << path << ENDM;
+  return object;
+}
+
+std::shared_ptr<core::MonitorObject> CcdbDatabase::retrieveMO(std::string taskName, std::string objectName, long timestamp)
+{
+  string path = taskName + "/" + objectName;
+  long when = timestamp == 0 ? getCurrentTimestamp() : timestamp;
+  map<string, string> headers;
+  map<string, string> metadata;
+  TObject* obj = retrieveTObject(path, metadata, when, &headers);
+  Version objectVersion(headers["qc_version"]); // retrieve headers to determine the version of the QC framework
+                                                //  ILOG(Debug) << "Version of object is " << objectVersion << ENDM;
+                                                //  ILOG(Debug) << "objectVersion == Version(\"0.0.0\") : " << (objectVersion == Version("0.0.0")) << ENDM;
+                                                //  ILOG(Debug) << "objectVersion < Version(\"0.25\") : " << (objectVersion < Version("0.25")) << ENDM
+
+  std::shared_ptr<MonitorObject> mo;
+  if (objectVersion == Version("0.0.0") || objectVersion < Version("0.25")) {
+    ILOG(Debug) << "Version of object " << taskName << "/" << objectName << " is < 0.25" << ENDM;
+    // The object is either in a TFile or is a blob but it was stored with storeAsTFile as a full MO
+    mo.reset(dynamic_cast<MonitorObject*>(obj));
+    if (mo == nullptr) {
+      ILOG(Error) << "Could not cast the object " << taskName << "/" << objectName << " to MonitorObject" << ENDM;
+    }
+  } else {
+    // Version >= 0.25 -> the object is stored directly unencapsulated
+    ILOG(Debug) << "Version of object " << taskName << "/" << objectName << " is >= 0.25" << ENDM;
+    mo = make_shared<MonitorObject>(obj, headers["qc_task_name"], headers["qc_detector_name"]);
+    // TODO should we remove the headers we know are general such as ETag and qc_task_name ?
+    mo->addMetadata(headers);
+  }
+  return mo;
+}
+
+std::shared_ptr<QualityObject> CcdbDatabase::retrieveQO(std::string qoPath, long timestamp)
+{
+  long when = timestamp == 0 ? getCurrentTimestamp() : timestamp;
+  map<string, string> headers;
+  map<string, string> metadata;
+  TObject* obj = retrieveTObject(qoPath, metadata, when, &headers);
+  std::shared_ptr<QualityObject> qo(dynamic_cast<QualityObject*>(obj));
+  if (qo == nullptr) {
+    ILOG(Error) << "Could not cast the object " << qoPath << " to QualityObject" << ENDM;
+  }
+  // TODO should we remove the headers we know are general such as ETag and qc_task_name ?
+  qo->addMetadata(headers);
+  return qo;
+}
+
+std::string CcdbDatabase::retrieveQOJson(std::string qoPath, long timestamp)
+{
+  map<string, string> metadata;
+  return retrieveJson(qoPath, timestamp, metadata);
+}
+
+std::string CcdbDatabase::retrieveMOJson(std::string taskName, std::string objectName, long timestamp)
+{
+  string path = taskName + "/" + objectName;
+  map<string, string> metadata;
+  return retrieveJson(path, timestamp, metadata);
+}
+
+std::string CcdbDatabase::retrieveJson(std::string path, long timestamp, const std::map<std::string, std::string>& metadata)
+{
+  map<string, string> headers;
+  auto tobj = retrieveTObject(path, metadata, timestamp, &headers);
+
+  if (tobj == nullptr) {
+    return std::string();
+  }
+
+  TObject* toConvert = nullptr;
+  if (tobj->IsA() == MonitorObject::Class()) { // a full MO -> pre-v0.25
+    std::shared_ptr<MonitorObject> mo(dynamic_cast<MonitorObject*>(tobj));
+    toConvert = mo->getObject();
+    mo->setIsOwner(false);
+  } else if (tobj->IsA() == QualityObject::Class()) {
+    toConvert = dynamic_cast<QualityObject*>(tobj);
+  } else { // something else but a TObject
+    toConvert = tobj;
+  }
+  if (toConvert == nullptr) {
+    ILOG(Error) << "Unable to get the object to convert" << ENDM;
+    return std::string();
+  }
+  TString json = TBufferJSON::ConvertToJSON(toConvert);
+  delete toConvert;
+
+  return json.Data();
 }
 
 void CcdbDatabase::disconnect()
@@ -278,21 +321,18 @@ std::vector<std::string> CcdbDatabase::getListing(std::string subpath)
 std::vector<std::string> CcdbDatabase::getPublishedObjectNames(std::string taskName)
 {
   std::vector<string> result;
-
   string listing = ccdbApi.list(taskName + "/.*", true, "Application/JSON");
 
-  // Split the string we received, by line. Also trim it and remove empty lines. Select the lines starting with "path".
-  std::stringstream ss(listing);
-  std::string line;
-  std::string taskNameEscaped = boost::replace_all_copy(taskName, "/", "\\/");
-  while (std::getline(ss, line, '\n')) {
-    ltrim(line);
-    rtrim(line);
-    if (line.length() > 0 && line.find("\"path\"") == 0) {
-      unsigned long objNameStart = 9 + taskNameEscaped.length();
-      string path = line.substr(objNameStart, line.length() - 2 /*final 2 char*/ - objNameStart);
-      result.push_back(path);
-    }
+  boost::property_tree::ptree pt;
+  stringstream ss;
+  ss << listing;
+  boost::property_tree::read_json(ss, pt);
+
+  BOOST_FOREACH (boost::property_tree::ptree::value_type& v, pt.get_child("objects")) {
+    assert(v.first.empty()); // array elements have no names
+    string data = v.second.get_child("path").data();
+    string path = data.substr(taskName.size());
+    result.push_back(path);
   }
 
   return result;
