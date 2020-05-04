@@ -40,6 +40,8 @@ class PhysicsTask /*final*/ : public TaskInterface // todo add back the "final" 
   void initialize(o2::framework::InitContext& ctx) override;
   void startOfActivity(Activity& activity) override;
   void startOfCycle() override;
+  void monitorDataReadout(o2::framework::ProcessingContext& ctx);
+  void monitorDataDigits(const o2::framework::DataRef& input);
   void monitorData(o2::framework::ProcessingContext& ctx) override;
   void endOfCycle() override;
   void endOfActivity(Activity& activity) override;
@@ -47,6 +49,8 @@ class PhysicsTask /*final*/ : public TaskInterface // todo add back the "final" 
 
   ssize_t getNumberOfDigits();
   void storeDigits(void* bufferPtr);
+
+  void plotDigit(const o2::mch::Digit& digit);
 
  private:
   int count;
@@ -66,6 +70,8 @@ class PhysicsTask /*final*/ : public TaskInterface // todo add back the "final" 
 
   std::map<int, TH1F*> mHistogramClchgDE;
   std::map<int, TH1F*> mHistogramClsizeDE;
+
+  int mPrintLevel;
 };
 
 } // namespace muonchambers
