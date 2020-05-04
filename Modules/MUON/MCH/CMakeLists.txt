@@ -29,7 +29,8 @@ target_include_directories(
 )
 
 #target_link_libraries(${MODULE_NAME} PUBLIC QualityControl)
-target_link_libraries(${MODULE_NAME} PUBLIC QualityControl O2::CommonDataFormat O2::GPUCommon O2::MCHMappingFactory O2::MCHMappingImpl3 O2::MCHMappingSegContour)
+target_link_libraries(${MODULE_NAME} PUBLIC QualityControl O2::CommonDataFormat O2::GPUCommon 
+O2::MCHMappingFactory O2::MCHMappingImpl3 O2::MCHMappingSegContour O2::MCHBase O2::MCHRawDecoder O2::MCHPreClustering)
 
 install(
         TARGETS ${MODULE_NAME}
