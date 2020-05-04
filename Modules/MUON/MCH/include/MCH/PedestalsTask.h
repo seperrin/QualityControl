@@ -69,6 +69,7 @@ class PedestalsTask /*final*/ : public TaskInterface // todo add back the "final
   //MapFEC mMapFEC;
   std::map<int, TH2F*> mHistogramPedestalsDE;
   std::map<int, TH2F*> mHistogramNoiseDE;
+  std::map<int, TH1F*> mHistogramDeltaDE[2];
   std::map<int, TH2F*> mHistogramPedestalsXY[2];
   std::map<int, TH2F*> mHistogramNoiseXY[2];
 

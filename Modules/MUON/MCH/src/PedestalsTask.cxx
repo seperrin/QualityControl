@@ -106,14 +106,14 @@ void PedestalsTask::initialize(o2::framework::InitContext& /*ctx*/)
 
         int index = 24 * cruid + linkid;
         mHistogramPedestals[index] = new TH2F(TString::Format("QcMuonChambers_Pedestals_CRU%01d_LINK%02d", cruid, linkid),
-                                              TString::Format("QcMuonChambers - Pedestals (CRU %01d, link %02d)", cruid, linkid), 40, 0, 40, 64, 0, 64);
+            TString::Format("QcMuonChambers - Pedestals (CRU %01d, link %02d)", cruid, linkid), 40, 0, 40, 64, 0, 64);
         //getObjectsManager()->startPublishing(mHistogramPedestals[index]);
         //getObjectsManager()->addCheck(mHistogramPedestals[index], "checkFromMuonChambers",
         //    "o2::quality_control_modules::muonchambers::MCHCheckPedestals", "QcMuonChambers");
 
         mHistogramNoise[index] =
-          new TH2F(TString::Format("QcMuonChambers_Noise_CRU%01d_LINK%02d", cruid, linkid),
-                   TString::Format("QcMuonChambers - Noise (CRU %01d link %02d)", cruid, linkid), 40, 0, 40, 64, 0, 64);
+            new TH2F(TString::Format("QcMuonChambers_Noise_CRU%01d_LINK%02d", cruid, linkid),
+                TString::Format("QcMuonChambers - Noise (CRU %01d link %02d)", cruid, linkid), 40, 0, 40, 64, 0, 64);
         //getObjectsManager()->startPublishing(mHistogramNoise[index]);
 
         int32_t link_id = mDecoder.getMapCRU(cruid, linkid);
@@ -130,20 +130,27 @@ void PedestalsTask::initialize(o2::framework::InitContext& /*ctx*/)
           if ((std::find(DEs.begin(), DEs.end(), de)) == DEs.end()) {
             DEs.push_back(de);
             TH2F* hPedDE = new TH2F(TString::Format("QcMuonChambers_Pedestals_DE%03d", de),
-                                    TString::Format("QcMuonChambers - Pedestals (DE%03d)", de), 2000, 0, 2000, 64, 0, 64);
+                TString::Format("QcMuonChambers - Pedestals (DE%03d)", de), 2000, 0, 2000, 64, 0, 64);
             mHistogramPedestalsDE.insert(make_pair(de, hPedDE));
             //getObjectsManager()->startPublishing(hPedDE);
             TH2F* hNoiseDE = new TH2F(TString::Format("QcMuonChambers_Noise_DE%03d", de),
-                                      TString::Format("QcMuonChambers - Noise (DE%03d)", de), 2000, 0, 2000, 64, 0, 64);
+                TString::Format("QcMuonChambers - Noise (DE%03d)", de), 2000, 0, 2000, 64, 0, 64);
             mHistogramNoiseDE.insert(make_pair(de, hNoiseDE));
             //getObjectsManager()->startPublishing(hNoiseDE);
 
+            TH1F* hDeltaDE = new TH1F(TString::Format("QcMuonChambers_Delta_b_%03d", de),
+                TString::Format("QcMuonChambers - Delta (DE%03d B)", de), 1000, 0, 1000);
+            mHistogramDeltaDE[0].insert(make_pair(de, hDeltaDE));
+            hDeltaDE = new TH1F(TString::Format("QcMuonChambers_Delta_nb_%03d", de),
+                TString::Format("QcMuonChambers - Delta (DE%03d NB)", de), 1000, 0, 1000);
+            mHistogramDeltaDE[1].insert(make_pair(de, hDeltaDE));
+
             for (int pi = 0; pi < 5; pi++) {
               TH1F* hNoiseDE = new TH1F(TString::Format("QcMuonChambers_Noise_Distr_DE%03d_b_%d", de, pi),
-                                        TString::Format("QcMuonChambers - Noise distribution (DE%03d B, %d)", de, pi), 1000, 0, 10);
+                  TString::Format("QcMuonChambers - Noise distribution (DE%03d B, %d)", de, pi), 1000, 0, 10);
               mHistogramNoiseDistributionDE[pi][0].insert(make_pair(de, hNoiseDE));
               hNoiseDE = new TH1F(TString::Format("QcMuonChambers_Noise_Distr_DE%03d_nb_%d", de, pi),
-                                  TString::Format("QcMuonChambers - Noise distribution (DE%03d NB, %d)", de, pi), 1000, 0, 10);
+                  TString::Format("QcMuonChambers - Noise distribution (DE%03d NB, %d)", de, pi), 1000, 0, 10);
               mHistogramNoiseDistributionDE[pi][1].insert(make_pair(de, hNoiseDE));
             }
 
@@ -153,21 +160,21 @@ void PedestalsTask::initialize(o2::framework::InitContext& /*ctx*/)
             float Ysize2 = Ysize / 2;
             {
               TH2F* hPedXY = new TH2F(TString::Format("QcMuonChambers_Pedestals_XYb_%03d", de),
-                                      TString::Format("QcMuonChambers - Pedestals XY (DE%03d B)", de), Xsize * 2, -Xsize2, Xsize2, Ysize * 2, -Ysize2, Ysize2);
+                  TString::Format("QcMuonChambers - Pedestals XY (DE%03d B)", de), Xsize * 2, -Xsize2, Xsize2, Ysize * 2, -Ysize2, Ysize2);
               mHistogramPedestalsXY[0].insert(make_pair(de, hPedXY));
               getObjectsManager()->startPublishing(hPedXY);
               TH2F* hNoiseXY = new TH2F(TString::Format("QcMuonChambers_Noise_XYb_%03d", de),
-                                        TString::Format("QcMuonChambers - Noise XY (DE%03d B)", de), Xsize * 2, -Xsize2, Xsize2, Ysize * 2, -Ysize2, Ysize2);
+                  TString::Format("QcMuonChambers - Noise XY (DE%03d B)", de), Xsize * 2, -Xsize2, Xsize2, Ysize * 2, -Ysize2, Ysize2);
               mHistogramNoiseXY[0].insert(make_pair(de, hNoiseXY));
               getObjectsManager()->startPublishing(hNoiseXY);
             }
             {
               TH2F* hPedXY = new TH2F(TString::Format("QcMuonChambers_Pedestals_XYnb_%03d", de),
-                                      TString::Format("QcMuonChambers - Pedestals XY (DE%03d NB)", de), Xsize * 2, -Xsize2, Xsize2, Ysize * 2, -Ysize2, Ysize2);
+                  TString::Format("QcMuonChambers - Pedestals XY (DE%03d NB)", de), Xsize * 2, -Xsize2, Xsize2, Ysize * 2, -Ysize2, Ysize2);
               mHistogramPedestalsXY[1].insert(make_pair(de, hPedXY));
               getObjectsManager()->startPublishing(hPedXY);
               TH2F* hNoiseXY = new TH2F(TString::Format("QcMuonChambers_Noise_XYnb_%03d", de),
-                                        TString::Format("QcMuonChambers - Noise XY (DE%03d NB)", de), Xsize * 2, -Xsize2, Xsize2, Ysize * 2, -Ysize2, Ysize2);
+                  TString::Format("QcMuonChambers - Noise XY (DE%03d NB)", de), Xsize * 2, -Xsize2, Xsize2, Ysize * 2, -Ysize2, Ysize2);
               mHistogramNoiseXY[1].insert(make_pair(de, hNoiseXY));
               getObjectsManager()->startPublishing(hNoiseXY);
             }
@@ -296,6 +303,13 @@ void PedestalsTask::save_histograms()
       ih++;
     }
   }
+  for (int pi = 0; pi < 2; pi++) {
+    auto ih = mHistogramDeltaDE[pi].begin();
+    while (ih != mHistogramDeltaDE[pi].end()) {
+      ih->second->Write();
+      ih++;
+    }
+  }
   for (int pi = 0; pi < 5; pi++) {
     for (int i = 0; i < 2; i++) {
       auto ih = mHistogramNoiseDistributionDE[pi][i].begin();
@@ -316,7 +330,7 @@ void PedestalsTask::monitorDataReadout(o2::framework::ProcessingContext& ctx)
   fprintf(flog, "\n================\nmonitorDataReadout\n================\n");
 
 #ifdef QC_MCH_SAVE_TEMP_ROOTFILE
-  if (count > 0 && (count % 1) == 0 /*&& count <= 5000*/) {
+  if (count > 0 && (count % 10) == 0 /*&& count <= 5000*/) {
     save_histograms();
   }
   printf("count: %d\n", count);
@@ -324,7 +338,7 @@ void PedestalsTask::monitorDataReadout(o2::framework::ProcessingContext& ctx)
 #endif
 
   // Reset the hits container
-  mDecoder.clearHits();
+  mDecoder.reset();
 
   // For some reason the input selection doesn't work, to be investigated...
   o2::framework::DPLRawParser parser(ctx.inputs() /*, o2::framework::select("readout:MCH/RAWDATA")*/);
@@ -347,102 +361,109 @@ void PedestalsTask::monitorDataReadout(o2::framework::ProcessingContext& ctx)
 
     // Run the decoder on the CRU buffer
     mDecoder.processData((const char*)raw, (size_t)(payloadSize + sizeof(o2::header::RAWDataHeaderV4)));
+  }
 
-    std::vector<SampaHit>& hits = mDecoder.getHits();
-    if (mPrintLevel >= 1)
-      fprintf(flog, "hits size: %lu\n", hits.size());
-    for (uint32_t i = 0; i < hits.size(); i++) {
-      SampaHit& hit = hits[i];
-      if (hit.link_id >= 24 || hit.ds_addr >= 40 || hit.chan_addr >= 64) {
-        fprintf(stdout, "hit[%d]: link_id=%d, ds_addr=%d, chan_addr=%d\n",
-                i, hit.link_id, hit.ds_addr, hit.chan_addr);
-        continue;
-      }
+  std::vector<SampaHit>& hits = mDecoder.getHits();
+  if (mPrintLevel >= 1)
+    fprintf(flog, "hits size: %lu\n", hits.size());
+  for (uint32_t i = 0; i < hits.size(); i++) {
+    SampaHit& hit = hits[i];
+    if (hit.link_id >= 24 || hit.ds_addr >= 40 || hit.chan_addr >= 64) {
+      fprintf(stdout, "hit[%d]: link_id=%d, ds_addr=%d, chan_addr=%d\n",
+          i, hit.link_id, hit.ds_addr, hit.chan_addr);
+      continue;
+    }
 
-      //int ds_group_id = hit.ds_addr / 5;
-      //int ds_id_in_group = hit.ds_addr % 5;
-      //int ds_chan_addr_in_group = hit.chan_addr + 64 * ds_id_in_group;
+    //int ds_group_id = hit.ds_addr / 5;
+    //int ds_id_in_group = hit.ds_addr % 5;
+    //int ds_chan_addr_in_group = hit.chan_addr + 64 * ds_id_in_group;
 
-      // Update the average and RMS of the pedestal values
-      for (uint32_t s = 0; s < hit.samples.size(); s++) {
-        int sample = hit.samples[s];
+    // Update the average and RMS of the pedestal values
+    for (uint32_t s = 0; s < hit.samples.size(); s++) {
+      int sample = hit.samples[s];
 
-        nhits[hit.cru_id][hit.link_id][hit.ds_addr][hit.chan_addr] += 1;
-        uint64_t N = nhits[hit.cru_id][hit.link_id][hit.ds_addr][hit.chan_addr];
+      nhits[hit.cru_id][hit.link_id][hit.ds_addr][hit.chan_addr] += 1;
+      uint64_t N = nhits[hit.cru_id][hit.link_id][hit.ds_addr][hit.chan_addr];
 
-        double p0 = pedestal[hit.cru_id][hit.link_id][hit.ds_addr][hit.chan_addr];
-        double p = p0 + (sample - p0) / N;
-        pedestal[hit.cru_id][hit.link_id][hit.ds_addr][hit.chan_addr] = p;
+      double p0 = pedestal[hit.cru_id][hit.link_id][hit.ds_addr][hit.chan_addr];
+      double p = p0 + (sample - p0) / N;
+      pedestal[hit.cru_id][hit.link_id][hit.ds_addr][hit.chan_addr] = p;
 
-        double M0 = noise[hit.cru_id][hit.link_id][hit.ds_addr][hit.chan_addr];
-        double M = M0 + (sample - p0) * (sample - p);
-        noise[hit.cru_id][hit.link_id][hit.ds_addr][hit.chan_addr] = M;
+      double M0 = noise[hit.cru_id][hit.link_id][hit.ds_addr][hit.chan_addr];
+      double M = M0 + (sample - p0) * (sample - p);
+      noise[hit.cru_id][hit.link_id][hit.ds_addr][hit.chan_addr] = M;
 
-        /*if (false && hit.link_id == 2 && hit.ds_addr == 37 && hit.chan_addr == 30)
+      /*if (false && hit.link_id == 2 && hit.ds_addr == 37 && hit.chan_addr == 30)
         fprintf(stdout, "M0=%f  sample=%d  M=%f  nhits=%lu  rms=%f\n",
             (float)M0, sample, (float)M, nhits[hit.cru_id][hit.link_id][hit.ds_addr][hit.chan_addr],
             (float)std::sqrt(noise[hit.cru_id][hit.link_id][hit.ds_addr][hit.chan_addr] /
                 nhits[hit.cru_id][hit.link_id][hit.ds_addr][hit.chan_addr]));*/
-      }
+    }
 
-      // Fill the histograms for each CRU link
-      double rms = std::sqrt(noise[hit.cru_id][hit.link_id][hit.ds_addr][hit.chan_addr] /
-                             nhits[hit.cru_id][hit.link_id][hit.ds_addr][hit.chan_addr]);
+    // Fill the histograms for each CRU link
+    double rms = std::sqrt(noise[hit.cru_id][hit.link_id][hit.ds_addr][hit.chan_addr] /
+        nhits[hit.cru_id][hit.link_id][hit.ds_addr][hit.chan_addr]);
 
-      /*if( false && hit.cru_id==0 && hit.link_id==0 && hit.ds_addr==0 && hit.chan_addr==0)
+    /*if( false && hit.cru_id==0 && hit.link_id==0 && hit.ds_addr==0 && hit.chan_addr==0)
       printf("%d %d %d %d -> %d %f %f\n", (int)hit.cru_id, (int)hit.link_id, (int)hit.ds_addr, (int)hit.chan_addr,
           (int)nhits[hit.cru_id][hit.link_id][hit.ds_addr][hit.chan_addr],
           pedestal[hit.cru_id][hit.link_id][hit.ds_addr][hit.chan_addr], rms);*/
 
-      mHistogramPedestals[hit.cru_id * 24 + hit.link_id]->SetBinContent(hit.ds_addr + 1, hit.chan_addr + 1,
-                                                                        pedestal[hit.cru_id][hit.link_id][hit.ds_addr][hit.chan_addr]);
-      mHistogramNoise[hit.cru_id * 24 + hit.link_id]->SetBinContent(hit.ds_addr + 1, hit.chan_addr + 1, rms);
+    mHistogramPedestals[hit.cru_id * 24 + hit.link_id]->SetBinContent(hit.ds_addr + 1, hit.chan_addr + 1,
+        pedestal[hit.cru_id][hit.link_id][hit.ds_addr][hit.chan_addr]);
+    mHistogramNoise[hit.cru_id * 24 + hit.link_id]->SetBinContent(hit.ds_addr + 1, hit.chan_addr + 1, rms);
 
-      if (hit.pad.fDE < 0)
-        continue;
+    if (hit.pad.fDE < 0)
+      continue;
+    if ((hit.pad.fCathode < 0) || (hit.pad.fCathode > 1))
+      continue;
 
-      // Fill the histograms for each detection element
-      int de = hit.pad.fDE;
-      int dsid = hit.pad.fDsID;
-      float padX = hit.pad.fX;
-      float padY = hit.pad.fY;
-      float padSizeX = hit.pad.fSizeX;
-      float padSizeY = hit.pad.fSizeY;
+    // Fill the histograms for each detection element
+    int de = hit.pad.fDE;
+    int dsid = hit.pad.fDsID;
+    float padX = hit.pad.fX;
+    float padY = hit.pad.fY;
+    float padSizeX = hit.pad.fSizeX;
+    float padSizeY = hit.pad.fSizeY;
 
-      /*if (false) fprintf(flog, "mapping: link_id=%d ds_addr=%d chan_addr=%d  ==>  de=%d dsid=%d x=%f y=%f sx=%f sy=%f\n",
+    /*if (false) fprintf(flog, "mapping: link_id=%d ds_addr=%d chan_addr=%d  ==>  de=%d dsid=%d x=%f y=%f sx=%f sy=%f\n",
         hit.link_id, hit.ds_addr, hit.chan_addr, de, dsid, padX, padY, padSizeX, padSizeY);*/
 
-      auto hPedDE = mHistogramPedestalsDE.find(de);
-      if ((hPedDE != mHistogramPedestalsDE.end()) && (hPedDE->second != NULL)) {
-        hPedDE->second->SetBinContent(dsid + 1, hit.chan_addr + 1, pedestal[hit.cru_id][hit.link_id][hit.ds_addr][hit.chan_addr]);
-      }
-      auto hNoiseDE = mHistogramNoiseDE.find(de);
-      if ((hNoiseDE != mHistogramNoiseDE.end()) && (hNoiseDE->second != NULL)) {
-        hNoiseDE->second->SetBinContent(dsid + 1, hit.chan_addr + 1, rms);
-      }
+    auto hPedDE = mHistogramPedestalsDE.find(de);
+    if ((hPedDE != mHistogramPedestalsDE.end()) && (hPedDE->second != NULL)) {
+      hPedDE->second->SetBinContent(dsid + 1, hit.chan_addr + 1, pedestal[hit.cru_id][hit.link_id][hit.ds_addr][hit.chan_addr]);
+    }
+    auto hNoiseDE = mHistogramNoiseDE.find(de);
+    if ((hNoiseDE != mHistogramNoiseDE.end()) && (hNoiseDE->second != NULL)) {
+      hNoiseDE->second->SetBinContent(dsid + 1, hit.chan_addr + 1, rms);
+    }
 
-      auto hPedXY = mHistogramPedestalsXY[hit.pad.fCathode].find(de);
-      if ((hPedXY != mHistogramPedestalsXY[hit.pad.fCathode].end()) && (hPedXY->second != NULL)) {
-        int binx_min = hPedXY->second->GetXaxis()->FindBin(padX - padSizeX / 2 + 0.1);
-        int binx_max = hPedXY->second->GetXaxis()->FindBin(padX + padSizeX / 2 - 0.1);
-        int biny_min = hPedXY->second->GetYaxis()->FindBin(padY - padSizeY / 2 + 0.1);
-        int biny_max = hPedXY->second->GetYaxis()->FindBin(padY + padSizeY / 2 - 0.1);
-        for (int by = biny_min; by <= biny_max; by++) {
-          for (int bx = binx_min; bx <= binx_max; bx++) {
-            hPedXY->second->SetBinContent(bx, by, pedestal[hit.cru_id][hit.link_id][hit.ds_addr][hit.chan_addr]);
-          }
+    auto hDeltaDE = mHistogramDeltaDE[hit.pad.fCathode].find(de);
+    if ((hDeltaDE != mHistogramDeltaDE[hit.pad.fCathode].end()) && (hDeltaDE->second != NULL)) {
+      hDeltaDE->second->Fill(hit.delta);
+    }
+
+    auto hPedXY = mHistogramPedestalsXY[hit.pad.fCathode].find(de);
+    if ((hPedXY != mHistogramPedestalsXY[hit.pad.fCathode].end()) && (hPedXY->second != NULL)) {
+      int binx_min = hPedXY->second->GetXaxis()->FindBin(padX - padSizeX / 2 + 0.1);
+      int binx_max = hPedXY->second->GetXaxis()->FindBin(padX + padSizeX / 2 - 0.1);
+      int biny_min = hPedXY->second->GetYaxis()->FindBin(padY - padSizeY / 2 + 0.1);
+      int biny_max = hPedXY->second->GetYaxis()->FindBin(padY + padSizeY / 2 - 0.1);
+      for (int by = biny_min; by <= biny_max; by++) {
+        for (int bx = binx_min; bx <= binx_max; bx++) {
+          hPedXY->second->SetBinContent(bx, by, pedestal[hit.cru_id][hit.link_id][hit.ds_addr][hit.chan_addr]);
         }
       }
-      auto hNoiseXY = mHistogramNoiseXY[hit.pad.fCathode].find(de);
-      if ((hNoiseXY != mHistogramNoiseXY[hit.pad.fCathode].end()) && (hNoiseXY->second != NULL)) {
-        int binx_min = hNoiseXY->second->GetXaxis()->FindBin(padX - padSizeX / 2 + 0.1);
-        int binx_max = hNoiseXY->second->GetXaxis()->FindBin(padX + padSizeX / 2 - 0.1);
-        int biny_min = hNoiseXY->second->GetYaxis()->FindBin(padY - padSizeY / 2 + 0.1);
-        int biny_max = hNoiseXY->second->GetYaxis()->FindBin(padY + padSizeY / 2 - 0.1);
-        for (int by = biny_min; by <= biny_max; by++) {
-          for (int bx = binx_min; bx <= binx_max; bx++) {
-            hNoiseXY->second->SetBinContent(bx, by, rms);
-          }
+    }
+    auto hNoiseXY = mHistogramNoiseXY[hit.pad.fCathode].find(de);
+    if ((hNoiseXY != mHistogramNoiseXY[hit.pad.fCathode].end()) && (hNoiseXY->second != NULL)) {
+      int binx_min = hNoiseXY->second->GetXaxis()->FindBin(padX - padSizeX / 2 + 0.1);
+      int binx_max = hNoiseXY->second->GetXaxis()->FindBin(padX + padSizeX / 2 - 0.1);
+      int biny_min = hNoiseXY->second->GetYaxis()->FindBin(padY - padSizeY / 2 + 0.1);
+      int biny_max = hNoiseXY->second->GetYaxis()->FindBin(padY + padSizeY / 2 - 0.1);
+      for (int by = biny_min; by <= biny_max; by++) {
+        for (int bx = binx_min; bx <= binx_max; bx++) {
+          hNoiseXY->second->SetBinContent(bx, by, rms);
         }
       }
     }
@@ -523,7 +544,7 @@ void PedestalsTask::monitorDataDigits(const o2::framework::DataRef& input)
       noiseDigits[de][padid] = M;
 
       double rms = std::sqrt(noiseDigits[de][padid] /
-                             nhitsDigits[de][padid]);
+          nhitsDigits[de][padid]);
 
       // Fill the histograms for each detection element
       auto hPedXY = mHistogramPedestalsXY[cathode].find(de);
