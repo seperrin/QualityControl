@@ -12,6 +12,7 @@
 #include "MCH/Mapping.h"
 #include "MCH/Decoding.h"
 #include "MCHBase/Digit.h"
+#include "MCHBase/PreCluster.h"
 
 class TH1F;
 class TH2F;
@@ -42,6 +43,7 @@ class PhysicsTask /*final*/ : public TaskInterface // todo add back the "final" 
   void startOfCycle() override;
   void monitorDataReadout(o2::framework::ProcessingContext& ctx);
   void monitorDataDigits(const o2::framework::DataRef& input);
+  void monitorDataPreclusters(o2::framework::ProcessingContext& ctx);
   void monitorData(o2::framework::ProcessingContext& ctx) override;
   void endOfCycle() override;
   void endOfActivity(Activity& activity) override;
@@ -51,6 +53,7 @@ class PhysicsTask /*final*/ : public TaskInterface // todo add back the "final" 
   void storeDigits(void* bufferPtr);
 
   void plotDigit(const o2::mch::Digit& digit);
+  void plotPrecluster(const o2::mch::PreCluster& preCluster, gsl::span<const o2::mch::Digit> digits);
 
  private:
   int count;
@@ -70,6 +73,9 @@ class PhysicsTask /*final*/ : public TaskInterface // todo add back the "final" 
 
   std::map<int, TH1F*> mHistogramClchgDE;
   std::map<int, TH1F*> mHistogramClsizeDE;
+
+  std::map<int, TH2F*> mHistogramPreclustersXY[4];
+
 
   int mPrintLevel;
 };

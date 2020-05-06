@@ -14,15 +14,15 @@
 #include "Headers/RAWDataHeader.h"
 #include "DPLUtils/DPLRawParser.h"
 #include "MCHRawDecoder/PageDecoder.h"
-#include "MCHBase/PreCluster.h"
 #include "MCHMappingInterface/Segmentation.h"
 #include "MCHMappingInterface/CathodeSegmentation.h"
-#include "MCHMappingFactory/CreateSegmentation.h"
 //#include "MCHPreClustering/PreClusterFinder.h"
 #include "QualityControl/QcInfoLogger.h"
 #include "MCH/PhysicsTask.h"
 
 using namespace std;
+
+#define QC_MCH_SAVE_TEMP_ROOTFILE 1
 
 static int gPrintLevel;
 
@@ -72,8 +72,12 @@ void PhysicsTask::initialize(o2::framework::InitContext& /*ctx*/)
 
   mDecoder.initialize();
 
+  mPrintLevel = 0;
+
+  flog = stdout; //fopen("/root/qc.log", "w");
+  fprintf(stdout, "PhysicsTask initialization finished\n");
+
   uint32_t dsid;
-  std::vector<int> DEs;
   for (int cruid = 0; cruid < 3; cruid++) {
     QcInfoLogger::GetInstance() << "JE SUIS ENTRÉ DANS LA BOUCLE CRUID " << cruid << AliceO2::InfoLogger::InfoLogger::endm;
     for (int linkid = 0; linkid < 24; linkid++) {
@@ -84,29 +88,32 @@ void PhysicsTask::initialize(o2::framework::InitContext& /*ctx*/)
         mHistogramNhits[index] = new TH2F(TString::Format("QcMuonChambers_NHits_CRU%01d_LINK%02d", cruid, linkid),
             TString::Format("QcMuonChambers - Number of hits (CRU link %02d)", index), 40, 0, 40, 64, 0, 64);
         //mHistogramPedestals->SetDrawOption("col");
-        getObjectsManager()->startPublishing(mHistogramNhits[index]);
+        //getObjectsManager()->startPublishing(mHistogramNhits[index]);
 
         mHistogramADCamplitude[index] = new TH1F(TString::Format("QcMuonChambers_ADC_Amplitude_CRU%01d_LINK%02d", cruid, linkid),
             TString::Format("QcMuonChambers - ADC amplitude (CRU link %02d)", index), 5000, 0, 5000);
         //mHistogramPedestals->SetDrawOption("col");
-        getObjectsManager()->startPublishing(mHistogramADCamplitude[index]);
+        //getObjectsManager()->startPublishing(mHistogramADCamplitude[index]);
       }
 
       int32_t link_id = mDecoder.getMapCRU(cruid, linkid);
+      QcInfoLogger::GetInstance() << "  LINK_ID " << link_id << AliceO2::InfoLogger::InfoLogger::endm;
       if (link_id == -1)
         continue;
       for (int ds_addr = 0; ds_addr < 40; ds_addr++) {
         QcInfoLogger::GetInstance() << "JE SUIS ENTRÉ DANS LA BOUCLE DS_ADDR " << ds_addr << AliceO2::InfoLogger::InfoLogger::endm;
-        uint32_t de = mDecoder.getMapFEC(link_id, ds_addr, de, dsid);
-        QcInfoLogger::GetInstance() << "C'EST LA LIGNE APRÈS LE GETMAPFEC, DE " << de << AliceO2::InfoLogger::InfoLogger::endm;
+        uint32_t de;
+        int32_t result = mDecoder.getMapFEC(link_id, ds_addr, de, dsid);
+        QcInfoLogger::GetInstance() << "C'EST LA LIGNE APRÈS LE GETMAPFEC, DE " << de << "  RESULT " << result << AliceO2::InfoLogger::InfoLogger::endm;
+        if(result < 0) continue;
 
-        if (!(std::find(DEs.begin(), DEs.end(), de) != DEs.end())) {
+        if (std::find(DEs.begin(), DEs.end(), de) == DEs.end()) {
           DEs.push_back(de);
 
           TH1F* h = new TH1F(TString::Format("QcMuonChambers_ADCamplitude_DE%03d", de),
               TString::Format("QcMuonChambers - ADC amplitude (DE%03d)", de), 5000, 0, 5000);
           mHistogramADCamplitudeDE.insert(make_pair(de, h));
-          getObjectsManager()->startPublishing(h);
+          //getObjectsManager()->startPublishing(h);
 
           float Xsize = 40 * 5;
           float Xsize2 = Xsize / 2;
@@ -120,16 +127,43 @@ void PhysicsTask::initialize(o2::framework::InitContext& /*ctx*/)
           h2 = new TH2F(TString::Format("QcMuonChambers_Nhits_HighAmpl_DE%03d", de),
               TString::Format("QcMuonChambers - Number of hits for Csum>500 (DE%03d)", de), Xsize * 2, -Xsize2, Xsize2, Ysize * 2, -Ysize2, Ysize2);
           mHistogramNhitsHighAmplDE.insert(make_pair(de, h2));
-          getObjectsManager()->startPublishing(h2);
+          //getObjectsManager()->startPublishing(h2);
         }
       }
     }
   }
 
-  mPrintLevel = 0;
+  for(int de = 1; de <= 1030; de++) {
+    const o2::mch::mapping::Segmentation* segment = &(o2::mch::mapping::segmentation(de));
+    if (segment == nullptr) continue;
 
-  flog = stdout; //fopen("/root/qc.log", "w");
-  fprintf(stdout, "PhysicsTask initialization finished\n");
+    TH1F* h = new TH1F(TString::Format("QcMuonChambers_Cluster_Charge_DE%03d", de),
+        TString::Format("QcMuonChambers - cluster charge (DE%03d)", de), 1000, 0, 50000);
+    mHistogramClchgDE.insert(make_pair(de, h));
+
+    float Xsize = 40 * 5;
+    float Xsize2 = Xsize / 2;
+    float Ysize = 50;
+    float Ysize2 = Ysize / 2;
+    float scale = 0.5;
+    {
+      TH2F* hXY = new TH2F(TString::Format("QcMuonChambers_Preclusters_Number_XY_%03d", de),
+          TString::Format("QcMuonChambers - Preclusters Number XY (DE%03d B)", de), Xsize / scale, -Xsize2, Xsize2, Ysize / scale, -Ysize2, Ysize2);
+      mHistogramPreclustersXY[0].insert(make_pair(de, hXY));
+
+      hXY = new TH2F(TString::Format("QcMuonChambers_Preclusters_B_XY_%03d", de),
+          TString::Format("QcMuonChambers - Preclusters XY (DE%03d B)", de), Xsize / scale, -Xsize2, Xsize2, Ysize / scale, -Ysize2, Ysize2);
+      mHistogramPreclustersXY[1].insert(make_pair(de, hXY));
+
+      hXY = new TH2F(TString::Format("QcMuonChambers_Preclusters_NB_XY_%03d", de),
+          TString::Format("QcMuonChambers - Preclusters XY (DE%03d NB)", de), Xsize / scale, -Xsize2, Xsize2, Ysize / scale, -Ysize2, Ysize2);
+      mHistogramPreclustersXY[2].insert(make_pair(de, hXY));
+
+      hXY = new TH2F(TString::Format("QcMuonChambers_Preclusters_BNB_XY_%03d", de),
+          TString::Format("QcMuonChambers - Preclusters XY (DE%03d B+NB)", de), Xsize / scale, -Xsize2, Xsize2, Ysize / scale, -Ysize2, Ysize2);
+      mHistogramPreclustersXY[3].insert(make_pair(de, hXY));
+    }
+  }
 }
 
 void PhysicsTask::startOfActivity(Activity& /*activity*/)
@@ -144,34 +178,6 @@ void PhysicsTask::startOfCycle()
 
 void PhysicsTask::monitorDataReadout(o2::framework::ProcessingContext& ctx)
 {
-#ifdef QC_MCH_SAVE_TEMP_ROOTFILE
-  if ((count % 1) == 0) {
-
-    TFile f("/tmp/qc.root", "RECREATE");
-    for (int i = 0; i < 3 * 24; i++) {
-      mHistogramNhits[i]->Write();
-      mHistogramADCamplitude[i]->Write();
-    }
-    int nbDEs = DEs.size();
-    for (int elem = 0; elem < nbDEs; elem++) {
-      int de = DEs[elem];
-      auto h = mHistogramADCamplitudeDE.find(de);
-      if ((h != mHistogramADCamplitudeDE.end()) && (h->second != NULL)) {
-        h->second->Write();
-      }
-      auto h2 = mHistogramNhitsDE.find(de);
-      if ((h2 != mHistogramNhitsDE.end()) && (h2->second != NULL)) {
-        h2->second->Write();
-      }
-
-      f.ls();
-      f.Close();
-    }
-  }
-  printf("count: %d\n", count);
-  count += 1;
-#endif
-
   // Reset the containers
   mDecoder.reset();
 
@@ -228,36 +234,9 @@ void PhysicsTask::monitorDataReadout(o2::framework::ProcessingContext& ctx)
   }
 }
 
+
 void PhysicsTask::monitorDataDigits(const o2::framework::DataRef& input)
 {
-#ifdef QC_MCH_SAVE_TEMP_ROOTFILE
-  if ((count % 1) == 0) {
-
-    TFile f("/tmp/qc.root", "RECREATE");
-    for (int i = 0; i < 3 * 24; i++) {
-      mHistogramNhits[i]->Write();
-      mHistogramADCamplitude[i]->Write();
-    }
-    int nbDEs = DEs.size();
-    for (int elem = 0; elem < nbDEs; elem++) {
-      int de = DEs[elem];
-      auto h = mHistogramADCamplitudeDE.find(de);
-      if ((h != mHistogramADCamplitudeDE.end()) && (h->second != NULL)) {
-        h->second->Write();
-      }
-      auto h2 = mHistogramNhitsDE.find(de);
-      if ((h2 != mHistogramNhitsDE.end()) && (h2->second != NULL)) {
-        h2->second->Write();
-      }
-
-      f.ls();
-      f.Close();
-    }
-  }
-  printf("count: %d\n", count);
-  count += 1;
-#endif
-
   if (input.spec->binding != "digits")
     return;
 
@@ -286,20 +265,114 @@ void PhysicsTask::monitorDataDigits(const o2::framework::DataRef& input)
     ptr += 1;
   }
 
-  for (uint32_t i = 0; i < digits.size(); i++) {
-    o2::mch::Digit& digit = digits[i];
-    plotDigit(digit);
+  for (auto& d : digits) {
+    if (mPrintLevel >= 1) {
+      std::cout << fmt::format("  DE {:4d}  PAD {:5d}  ADC {:6d}  TIME {:4d}", d.getDetID(), d.getPadID(), d.getADC(), d.getTimeStamp());
+      std::cout << std::endl;
+    }
+    plotDigit(d);
   }
+}
+
+
+void PhysicsTask::monitorDataPreclusters(o2::framework::ProcessingContext& ctx)
+{
+  // get the input preclusters and associated digits
+  auto preClusters = ctx.inputs().get<gsl::span<o2::mch::PreCluster>>("preclusters");
+  auto digits = ctx.inputs().get<gsl::span<o2::mch::Digit>>("preclusterdigits");
+
+  if (mPrintLevel >= 1) {
+  std::cout<<"preClusters.size()="<<preClusters.size()<<std::endl;
+  }
+  for(auto& p : preClusters) {
+    plotPrecluster(p, digits);
+  }
+  //for (uint32_t i = 0; i < digits.size(); i++) {
+  //  o2::mch::Digit& digit = digits[i];
+  //  plotDigit(digit);
+  //}
 }
 
 
 void PhysicsTask::monitorData(o2::framework::ProcessingContext& ctx)
 {
-  monitorDataReadout(ctx);
+#ifdef QC_MCH_SAVE_TEMP_ROOTFILE_
+  if ((count % 100) == 0) {
+
+    TFile f("/tmp/qc.root", "RECREATE");
+    for (int i = 0; i < 3 * 24; i++) {
+      //mHistogramNhits[i]->Write();
+      //mHistogramADCamplitude[i]->Write();
+    }
+    //std::cout<<"mHistogramADCamplitudeDE.size() = "<<mHistogramADCamplitudeDE.size()<<"  DEs.size()="<<DEs.size()<<std::endl;
+    int nbDEs = DEs.size();
+    for (int elem = 0; elem < nbDEs; elem++) {
+      int de = DEs[elem];
+      //std::cout<<"  de="<<de<<std::endl;
+      {
+        auto h = mHistogramADCamplitudeDE.find(de);
+        if ((h != mHistogramADCamplitudeDE.end()) && (h->second != NULL)) {
+          h->second->Write();
+        }
+      }
+      {
+        auto h = mHistogramNhitsDE.find(de);
+        if ((h != mHistogramNhitsDE.end()) && (h->second != NULL)) {
+          h->second->Write();
+        }
+      }
+      {
+        auto h = mHistogramNhitsHighAmplDE.find(de);
+        if ((h != mHistogramNhitsHighAmplDE.end()) && (h->second != NULL)) {
+          h->second->Write();
+        }
+      }
+    }
+    {
+      for(int i = 0; i < 4; i++) {
+        for(auto& h2 : mHistogramPreclustersXY[i]) {
+          if (h2.second != nullptr) {
+            h2.second->Write();
+          }
+        }
+        //auto h2 = mHistogramPreclustersXY[i].find(de);
+        //if ((h2 != mHistogramNhitsDE.end()) && (h2->second != NULL)) {
+        //  h2->second->Write();
+        //}
+      }
+    }
+
+    f.ls();
+    f.Close();
+    if (mPrintLevel == 0) {
+      printf("count: %d\n", count);
+    }
+  }
+  if (mPrintLevel >= 1) {
+    printf("count: %d\n", count);
+  }
+  count += 1;
+#endif
+
+  bool preclustersFound = false;
+  bool preclusterDigitsFound = false;
   for (auto&& input : ctx.inputs()) {
-    QcInfoLogger::GetInstance() << "run PedestalsTask: input " << input.spec->binding << AliceO2::InfoLogger::InfoLogger::endm;
-    if (input.spec->binding == "digits")
+    if (mPrintLevel >= 1) {
+      QcInfoLogger::GetInstance() << "run PedestalsTask: input " << input.spec->binding << AliceO2::InfoLogger::InfoLogger::endm;
+    }
+    if (input.spec->binding == "digits") {
       monitorDataDigits(input);
+    }
+    if (input.spec->binding == "preclusters") {
+      preclustersFound = true;
+    }
+    if (input.spec->binding == "preclusterdigits") {
+      preclusterDigitsFound = true;
+    }
+  }
+  //monitorDataReadout(ctx);
+  if(preclustersFound && preclusterDigitsFound) {
+    monitorDataPreclusters(ctx);
   }
 }
 
@@ -337,7 +410,7 @@ void PhysicsTask::plotDigit(const o2::mch::Digit& digit)
       h->second->Fill(ADC);
     }
 
-    if (ADC > 0) {
+    if (cathode == 0 && ADC > 0) {
       auto h2 = mHistogramNhitsDE.find(de);
       if ((h2 != mHistogramNhitsDE.end()) && (h2->second != NULL)) {
         int binx_min = h2->second->GetXaxis()->FindBin(padX - padSizeX / 2 + 0.1);
@@ -353,7 +426,7 @@ void PhysicsTask::plotDigit(const o2::mch::Digit& digit)
         }
       }
     }
-    if (ADC > 500) {
+    if (cathode == 0 && ADC > 500) {
       auto h2 = mHistogramNhitsHighAmplDE.find(de);
       if ((h2 != mHistogramNhitsHighAmplDE.end()) && (h2->second != NULL)) {
         int binx_min = h2->second->GetXaxis()->FindBin(padX - padSizeX / 2 + 0.1);
@@ -376,9 +449,207 @@ void PhysicsTask::plotDigit(const o2::mch::Digit& digit)
 }
 
 
+
+
+//_________________________________________________________________________________________________
+static void CoG(gsl::span<const o2::mch::Digit> precluster, double& Xcog, double& Ycog)
+{
+  double xmin = 1E9;
+  double ymin = 1E9;
+  double xmax = -1E9;
+  double ymax = -1E9;
+  double charge[] = { 0.0, 0.0 };
+  int multiplicity[] = { 0, 0 };
+
+  double x[] = { 0.0, 0.0 };
+  double y[] = { 0.0, 0.0 };
+
+  double xsize[] = { 0.0, 0.0 };
+  double ysize[] = { 0.0, 0.0 };
+
+  int detid = precluster[0].getDetID();
+  const o2::mch::mapping::Segmentation& segment = o2::mch::mapping::segmentation(detid);
+
+  for ( size_t i = 0; i < precluster.size(); ++i ) {
+    const o2::mch::Digit& digit = precluster[i];
+    int padid = digit.getPadID();
+
+    // position and size of current pad
+    double padPosition[2] = {segment.padPositionX(padid), segment.padPositionY(padid)};
+    double padSize[2] = {segment.padSizeX(padid), segment.padSizeY(padid)};
+
+    // update of xmin/max et ymin/max
+    xmin = std::min(padPosition[0]-0.5*padSize[0],xmin);
+    xmax = std::max(padPosition[0]+0.5*padSize[0],xmax);
+    ymin = std::min(padPosition[1]-0.5*padSize[1],ymin);
+    ymax = std::max(padPosition[1]+0.5*padSize[1],ymax);
+
+    // cathode index
+    int cathode = segment.isBendingPad(padid) ? 0 : 1;
+
+    // update of the cluster position, size, charge and multiplicity
+    x[cathode] += padPosition[0] * digit.getADC();
+    y[cathode] += padPosition[1] * digit.getADC();
+    xsize[cathode] += padSize[0];
+    ysize[cathode] += padSize[1];
+    charge[cathode] += digit.getADC();
+    multiplicity[cathode] += 1;
+  }
+
+  // Computation of the CoG coordinates for the two cathodes
+  for ( int cathode = 0; cathode < 2; ++cathode ) {
+    if ( charge[cathode] != 0 ) {
+      x[cathode] /= charge[cathode];
+      y[cathode] /= charge[cathode];
+    }
+    if ( multiplicity[cathode] != 0 ) {
+      double sqrtCharge = sqrt(charge[cathode]);
+      xsize[cathode] /= (multiplicity[cathode] * sqrtCharge);
+      ysize[cathode] /= (multiplicity[cathode] * sqrtCharge);
+    } else {
+      xsize[cathode] = 1E9;
+      ysize[cathode] = 1E9;
+    }
+  }
+
+  // each CoG coordinate is taken from the cathode with the best precision
+  Xcog = ( xsize[0] < xsize[1] ) ? x[0] : x[1];
+  Ycog = ( ysize[0] < ysize[1] ) ? y[0] : y[1];
+}
+
+
+
+void PhysicsTask::plotPrecluster(const o2::mch::PreCluster& preCluster, gsl::span<const o2::mch::Digit> digits)
+{
+  // get the digits of this precluster
+  auto preClusterDigits = digits.subspan(preCluster.firstDigit, preCluster.nDigits);
+
+  bool cathode[2] = {false, false};
+  float chargeSum[2] = {0, 0};
+
+  int detid = preClusterDigits[0].getDetID();
+  const o2::mch::mapping::Segmentation& segment = o2::mch::mapping::segmentation(detid);
+
+  for ( size_t i = 0; i < preClusterDigits.size(); ++i ) {
+    const o2::mch::Digit& digit = preClusterDigits[i];
+    int padid = digit.getPadID();
+
+    // cathode index
+    int cid = segment.isBendingPad(padid) ? 0 : 1;
+    cathode[cid] = true;
+    chargeSum[cid] += digit.getADC();
+  }
+
+  // filter out single-pad clusters
+  if (preCluster.nDigits < 2) {
+    return;
+  }
+
+
+  if (mPrintLevel >= 1) {
+    std::cout<<"[pre-cluster] charge = "<<chargeSum[0]<<" "<<chargeSum[1]<<std::endl;
+    for (auto& d : preClusterDigits) {
+      std::cout << fmt::format("  DE {:4d}  PAD {:5d}  ADC {:6d}  TIME {:4d}", d.getDetID(), d.getPadID(), d.getADC(), d.getTimeStamp());
+      std::cout << std::endl;
+    }
+  }
+
+
+  float chargeTot = -1;
+  if(cathode[0] && cathode[1]) {
+    //chargeTot = (chargeSum[0] + chargeSum[1]) / 2;
+    chargeTot = chargeSum[0] + chargeSum[1];
+  } else if(false && cathode[0]) {
+    chargeTot = chargeSum[0];
+  } else if(false && cathode[1]) {
+    chargeTot = chargeSum[1];
+  }
+  auto hCharge = mHistogramClchgDE.find(detid);
+  if ((hCharge != mHistogramClchgDE.end()) && (hCharge->second != NULL)) {
+    hCharge->second->Fill(chargeTot);
+  }
+
+  double Xcog, Ycog;
+  CoG(preClusterDigits, Xcog, Ycog);
+
+  auto hXY0 = mHistogramPreclustersXY[0].find(detid);
+  if ((hXY0 != mHistogramPreclustersXY[0].end()) && (hXY0->second != NULL)) {
+    hXY0->second->Fill(Xcog, Ycog);
+  }
+
+  int hid = 1;
+  if(cathode[0]) {
+    auto hXY1 = mHistogramPreclustersXY[1].find(detid);
+    if ((hXY1 != mHistogramPreclustersXY[1].end()) && (hXY1->second != NULL)) {
+      hXY1->second->Fill(Xcog, Ycog);
+    }
+  }
+  if(cathode[1]) {
+    auto hXY1 = mHistogramPreclustersXY[2].find(detid);
+    if ((hXY1 != mHistogramPreclustersXY[2].end()) && (hXY1->second != NULL)) {
+      hXY1->second->Fill(Xcog, Ycog);
+    }
+  }
+  if(cathode[0] && cathode[1]) {
+    auto hXY1 = mHistogramPreclustersXY[3].find(detid);
+    if ((hXY1 != mHistogramPreclustersXY[3].end()) && (hXY1->second != NULL)) {
+      hXY1->second->Fill(Xcog, Ycog);
+    }
+  }
+}
+
+
 void PhysicsTask::endOfCycle()
 {
   QcInfoLogger::GetInstance() << "endOfCycle" << AliceO2::InfoLogger::InfoLogger::endm;
+#ifdef QC_MCH_SAVE_TEMP_ROOTFILE
+    TFile f("/tmp/qc.root", "RECREATE");
+    for (int i = 0; i < 3 * 24; i++) {
+      //mHistogramNhits[i]->Write();
+      //mHistogramADCamplitude[i]->Write();
+    }
+    //std::cout<<"mHistogramADCamplitudeDE.size() = "<<mHistogramADCamplitudeDE.size()<<"  DEs.size()="<<DEs.size()<<std::endl;
+    int nbDEs = DEs.size();
+    for (int elem = 0; elem < nbDEs; elem++) {
+      int de = DEs[elem];
+      //std::cout<<"  de="<<de<<std::endl;
+      {
+        auto h = mHistogramADCamplitudeDE.find(de);
+        if ((h != mHistogramADCamplitudeDE.end()) && (h->second != NULL)) {
+          h->second->Write();
+        }
+      }
+      {
+        auto h = mHistogramNhitsDE.find(de);
+        if ((h != mHistogramNhitsDE.end()) && (h->second != NULL)) {
+          h->second->Write();
+        }
+      }
+      {
+        auto h = mHistogramNhitsHighAmplDE.find(de);
+        if ((h != mHistogramNhitsHighAmplDE.end()) && (h->second != NULL)) {
+          h->second->Write();
+        }
+      }
+    }
+    {
+      for(int i = 0; i < 4; i++) {
+        for(auto& h2 : mHistogramPreclustersXY[i]) {
+          if (h2.second != nullptr) {
+            h2.second->Write();
+          }
+        }
+      }
+      for(auto& h : mHistogramClchgDE) {
+        if (h.second != nullptr) {
+          h.second->Write();
+        }
+      }
+    }
+
+    f.ls();
+    f.Close();
+#endif
 }
 
 void PhysicsTask::endOfActivity(Activity& /*activity*/)
