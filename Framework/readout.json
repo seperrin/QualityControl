@@ -25,9 +25,9 @@
     "tasks": {
       "daqTask": {
         "active": "true",
-        "className": "o2::quality_control_modules::daq::DaqTask",
-        "moduleName": "QcDaq",
-        "detectorName": "DAQ",
+        "className": "o2::quality_control_modules::muonchambers::RawDataProcessor",
+        "moduleName": "QcMuonChambers",
+        "detectorName": "MCH",
         "cycleDurationSeconds": "10",
         "maxNumberCycles": "-1",
         "dataSource": {
@@ -43,11 +43,11 @@
       "id": "readout",
       "active": "true",
       "machines": [],
-      "query" : "digits:MCH/DIGITS",
+      "query" : "readout:ROUT/RAWDATA",
       "samplingConditions": [
         {
           "condition": "random",
-          "fraction": "0.1",
+          "fraction": "1",
           "seed": "1441"
         }
       ],
