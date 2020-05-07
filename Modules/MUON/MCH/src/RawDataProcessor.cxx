@@ -72,6 +72,7 @@ RawDataProcessor::~RawDataProcessor()
 
 void RawDataProcessor::initialize(o2::framework::InitContext& /*ctx*/)
 {
+  setenv("INFOLOGGER_MODE", "stdout", 1);
   QcInfoLogger::GetInstance() << "initialize RawDataProcessor" << AliceO2::InfoLogger::InfoLogger::endm;
   printf("initialize RawDataProcessor\n");
   if (true) {
@@ -297,7 +298,7 @@ void RawDataProcessor::fill_noise_distributions()
   }
 }
 
-void RawDataProcessor::monitorDataReadout(o2::framework::ProcessingContext& ctx)
+void RawDataProcessor::monitorData(o2::framework::ProcessingContext& ctx)
 {
   // todo: update API examples or refer to DPL README.md
 
@@ -305,7 +306,7 @@ void RawDataProcessor::monitorDataReadout(o2::framework::ProcessingContext& ctx)
   fprintf(flog, "\n\n====================\nRawDataProcessor::monitorDataReadout\n====================\n");
   //fprintf(flog,"count: %d\n", count);
 
-  if ((count % 10000) == 0 /*&& count <= 5000*/) {
+  if ((count % 1000) == 0 /*&& count <= 5000*/) {
     TFile f("/tmp/qc.root", "RECREATE");
     fill_noise_distributions();
     for (int i = 0; i < MCH_MAX_CRU_IN_FLP * 24; i++) {
@@ -419,21 +420,28 @@ void RawDataProcessor::monitorDataReadout(o2::framework::ProcessingContext& ctx)
       }
       if( bad_hit ) continue;
        */
-
+        std::cout << "Looking at a new hit [" << i << "]" << std::endl;
       for (uint32_t s = 0; s < hit.samples.size(); s++) {
         //continue;
+          std::cout << "Looking at a new sample [" << s << "]" << std::endl;
         int sample = hit.samples[s];
-
+std::cout << " sample = " << sample << std::endl;
         nhits[hit.cru_id][hit.link_id][hit.ds_addr][hit.chan_addr] += 1;
         uint64_t N = nhits[hit.cru_id][hit.link_id][hit.ds_addr][hit.chan_addr];
+          
+          std::cout << " Nhits pour ce pad = " << nhits << std::endl;
 
         double p0 = pedestal[hit.cru_id][hit.link_id][hit.ds_addr][hit.chan_addr];
         double p = p0 + (sample - p0) / N;
         pedestal[hit.cru_id][hit.link_id][hit.ds_addr][hit.chan_addr] = p;
+          
+          std::cout << " pedestal = " << p << std::endl;
 
         double M0 = noise[hit.cru_id][hit.link_id][hit.ds_addr][hit.chan_addr];
         double M = M0 + (sample - p0) * (sample - p);
         noise[hit.cru_id][hit.link_id][hit.ds_addr][hit.chan_addr] = M;
+          
+          std::cout << " noise = " << M << std::endl;
         if (false && hit.link_id == 2 && hit.ds_addr == 37 && hit.chan_addr == 30)
           fprintf(stdout, "M0=%f  sample=%d  M=%f  nhits=%lu  rms=%f\n",
                   (float)M0, sample, (float)M, nhits[hit.cru_id][hit.link_id][hit.ds_addr][hit.chan_addr],
@@ -514,17 +522,19 @@ void RawDataProcessor::monitorDataReadout(o2::framework::ProcessingContext& ctx)
 }
 
 
-void RawDataProcessor::monitorData(o2::framework::ProcessingContext& ctx)
+void RawDataProcessor::monitorDataDigits(o2::framework::ProcessingContext& ctx)
 {
 
     //Copie de monitor data readout adaptee à la lecture de digits
   // todo: update API examples or refer to DPL README.md
 
-  //QcInfoLogger::GetInstance() << "monitorData" << AliceO2::InfoLogger::InfoLogger::endm;
+  QcInfoLogger::GetInstance() << "monitorData" << AliceO2::InfoLogger::InfoLogger::endm;
   fprintf(flog, "\n\n====================\nRawDataProcessor::monitorDataDigits\n====================\n");
+    LOG(INFO) << "In monitorData de RDP";
+    printf("count: %d\n", count);
   //fprintf(flog,"count: %d\n", count);
 
-  if ((count % 10000) == 0 /*&& count <= 5000*/) {
+  if ((count % 1000) == 0 /*&& count <= 5000*/) {
     TFile f("/tmp/qc.root", "RECREATE");
     fill_noise_distributions();
     for (int i = 0; i < MCH_MAX_CRU_IN_FLP * 24; i++) {
@@ -580,7 +590,7 @@ void RawDataProcessor::monitorData(o2::framework::ProcessingContext& ctx)
   //  inputName=readout
   //  dataOrigin=ITS
   //  dataDescription=RAWDATA
-
+    std::vector<o2::mch::Digit> digits;
   // 1. in a loop
   for (auto&& input : ctx.inputs()) {
     //QcInfoLogger::GetInstance() << "run RawDataProcessor: input " << input.spec->binding << AliceO2::InfoLogger::InfoLogger::endm;
@@ -605,12 +615,11 @@ void RawDataProcessor::monitorData(o2::framework::ProcessingContext& ctx)
 
       //Recuperer le buffer digit dpl tel qu'on l'a envoyé
       
-      std::vector<o2::mch::Digit> digits{0};
       o2::mch::Digit* digitsBuffer = NULL;
       digitsBuffer = (o2::mch::Digit*)input.payload;
       int ndigits = (int)((int)header->payloadSize/sizeof(o2::mch::Digit));
       
-      std::cout << "There are " << ndigits << " digits in the payload" <<std::endl;
+      fprintf(flog, "Digits in the payload: %d\n", ndigits);
 
       o2::mch::Digit* ptr = (o2::mch::Digit*)digitsBuffer;
       for(unsigned int di = 0; di < ndigits; di++) {
@@ -627,14 +636,15 @@ void RawDataProcessor::monitorData(o2::framework::ProcessingContext& ctx)
         int ADC = digit.getADC();
         int de = digit.getDetID();
         int padid = digit.getPadID();
+        
+        fprintf(stdout, "digit[%d]: ADC=%d, DetId=%d, PadId=%d\n",
+        i, ADC, de, padid);
 
       if (ADC < 0 || de < 0 || padid < 0) {
-        fprintf(stdout, "digit[%d]: ADC=%d, DetId=%d, PadId=%d\n",
-                i, ADC, de, padid);
-        continue;
+          continue;
       }
 
-
+        std::cout << "Now calling segmentation for this digit" << std::endl;
 
     // APPELER LA SEGMENTATION
 
@@ -652,27 +662,30 @@ void RawDataProcessor::monitorData(o2::framework::ProcessingContext& ctx)
             int link_id = 0;
 
 
+        std::cout << "Updating noise and pedestal matrices" << std::endl;
 
         nhitsDigits[de][padid] += 1;
         uint64_t N = nhitsDigits[de][padid];
+        
+        std::cout << " NhitsDigits pour ce pad = " << N << std::endl;
 
         double p0 = pedestalDigits[de][padid];
         double p = p0 + (ADC - p0) / N;
         pedestalDigits[de][padid] = p;
+        
+        std::cout << " padestal = " << p << std::endl;
 
         double M0 = noiseDigits[de][padid];
         double M = M0 + (ADC - p0) * (ADC - p);
         noiseDigits[de][padid] = M;
+        
+        std::cout << " noise = " << M << std::endl;
 
     
       double rms = std::sqrt(noiseDigits[de][padid] /
                              nhitsDigits[de][padid]);
     
-
-
-      if (de < 0)
-        continue;
-
+            std::cout << "Filling histograms" << std::endl;
 
       auto hPedXY = mHistogramPedestalsXY[cathode].find(de);
       if ((hPedXY != mHistogramPedestalsXY[cathode].end()) && (hPedXY->second != NULL)) {
@@ -703,7 +716,7 @@ void RawDataProcessor::monitorData(o2::framework::ProcessingContext& ctx)
       }
     }
 
-    mDecoder.clearDigits();
+    digits.clear();
   }
 }
 
