@@ -951,8 +951,8 @@ void MuonChambersDataDecoder::initialize()
   //mMapCRU[0].addDSMapping(1, 0, de, 5);
   //mMapCRU[0].addDSMapping(1, 2, de, 4);
   //mMapCRU[0].addDSMapping(1, 4, de, 3);
-  mMapCRU.readMapping("/tmp/cru.map");
-  mMapFEC.readDSMapping("/tmp/fec.map");
+  mMapCRU.readMapping("/tmp/cru-DE819.map");
+  mMapFEC.readDSMapping("/tmp/fec-DE819.map");
 
   gPrintLevel = 0;
 
