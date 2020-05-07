@@ -1,5 +1,5 @@
 ///
-/// \file   MuonChambersDataDecoder.h
+/// \file   Decoding.h
 /// \author Andrea Ferrero
 ///
 
@@ -8,7 +8,7 @@
 
 #include "QualityControl/TaskInterface.h"
 #include "MCH/sampa_header.h"
-#include "MCH/MuonChambersMapping.h"
+#include "MCH/Mapping.h"
 #include "MCHBase/Digit.h"
 
 using namespace o2::quality_control::core;
@@ -22,13 +22,13 @@ namespace muonchambers
 
 enum DualSampaStatus {
   notSynchronized = 1,
-  synchronized = 2,
+  //synchronized = 2,
   headerToRead = 3,
   sizeToRead = 4,
   timeToRead = 5,
-  dataToRead = 6,
-  chargeToRead = 7,
-  OK = 8 // Data block filled (over a time window)
+  dataToRead = 6
+  //chargeToRead = 7,
+  //OK = 8 // Data block filled (over a time window)
 };
 
 struct SampaHit {
@@ -37,6 +37,7 @@ struct SampaHit {
   uint32_t size, time;
   std::vector<uint16_t> samples;
   uint64_t csum;
+  int32_t delta;
   MapPad pad;
 };
 
@@ -48,7 +49,7 @@ struct DualSampa {
   uint64_t powerMultiplier;        // power to convert to move bits
   int nsyn2Bits;                   // Nb of words waiting synchronization
   Sampa::SampaHeaderStruct header; // current channel header
-  int64_t bxc[2];
+  unsigned long bxc[2];
   uint32_t csize, ctime, cid, sample;
   int chan_addr[2];
   uint64_t packetsize;
@@ -57,22 +58,23 @@ struct DualSampa {
   int ndata[2][32];
   int nclus[2][32];
   double pedestal[2][32], noise[2][32];
+  int32_t min[2][32], max[2][32], delta[2][32];
   SampaHit hit;
 };
 
 struct DualSampaGroup {
-  int64_t bxc;
+  long int bxc;
 };
 
 /// \brief decoding of MCH data
 /// \author Andrea Ferrero
-class MuonChambersDataDecoder
+class Decoder
 {
  public:
   /// \brief Constructor
-  MuonChambersDataDecoder();
+  Decoder();
   /// Destructor
-  ~MuonChambersDataDecoder();
+  ~Decoder();
 
   // Definition of the methods for the template method pattern
   void initialize();
@@ -88,7 +90,8 @@ class MuonChambersDataDecoder
   int32_t getMapCRU(int cruid, int linkid) { return mMapCRU.getLink(cruid, linkid); }
   int32_t getMapFEC(uint32_t link_id, uint32_t ds_addr, uint32_t& de, uint32_t& dsid)
   {
-    if( !mMapFEC.getDSMapping(link_id, ds_addr, de, dsid) ) return -1;
+    if (!mMapFEC.getDSMapping(link_id, ds_addr, de, dsid))
+      return -1;
     return de;
   }
   MapFEC& getMapFEC() { return mMapFEC; }

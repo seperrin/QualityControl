@@ -9,12 +9,12 @@
 // or submit itself to any jurisdiction.
 
 ///
-/// \file   MCHCheckPedestals.h
+/// \file   PedestalsCheck.h
 /// \author Andrea Ferrero
 ///
 
-#ifndef QC_MODULE_MCH_MCHCHECKPEDESTALS_H
-#define QC_MODULE_MCH_MCHCHECKPEDESTALS_H
+#ifndef QC_MODULE_MCH_PEDESTALSCHECK_H
+#define QC_MODULE_MCH_PEDESTALSCHECK_H
 
 #include "QualityControl/CheckInterface.h"
 #include "QualityControl/MonitorObject.h"
@@ -26,13 +26,13 @@ namespace o2::quality_control_modules::muonchambers
 /// \brief  Check whether a plot is empty or not.
 ///
 /// \author Barthelemy von Haller
-class MCHCheckPedestals : public o2::quality_control::checker::CheckInterface
+class PedestalsCheck : public o2::quality_control::checker::CheckInterface
 {
  public:
   /// Default constructor
-  MCHCheckPedestals();
+  PedestalsCheck();
   /// Destructor
-  ~MCHCheckPedestals() override;
+  ~PedestalsCheck() override;
 
   // Override interface
   void configure(std::string name) override;
@@ -41,17 +41,15 @@ class MCHCheckPedestals : public o2::quality_control::checker::CheckInterface
   std::string getAcceptedType() override;
 
   /// Minimum value for SAMPA pedestals
-  Float_t minMCHpedestal;
+  float minMCHpedestal;
   /// Maximum value for SAMPA pedestals
-  Float_t maxMCHpedestal;
+  float maxMCHpedestal;
 
  private:
-    
-    /// Vector filled with DualSampas Ids that have been tested but sent back no data
-    std::vector<int> missing;
-    
-  ClassDefOverride(MCHCheckPedestals, 1);
-  
+  /// Vector filled with DualSampas Ids that have been tested but sent back no data
+  std::vector<int> missing;
+
+  ClassDefOverride(PedestalsCheck, 1);
 };
 
 } // namespace o2::quality_control_modules::muonchambers

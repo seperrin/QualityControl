@@ -1,17 +1,14 @@
 ///
-/// \file   RawDataProcessor.h
-/// \author Barthelemy von Haller
-/// \author Piotr Konopka
+/// \file   PedestalsTask.h
 /// \author Andrea Ferrero
 ///
 
-#ifndef QC_MODULE_MUONCHAMBERS_RAWDATAPROCESSOR_H
-#define QC_MODULE_MUONCHAMBERS_RAWDATAPROCESSOR_H
+#ifndef QC_MODULE_MUONCHAMBERS_PEDESTALSTASK_H
+#define QC_MODULE_MUONCHAMBERS_PEDESTALSTASK_H
 
 #include "QualityControl/TaskInterface.h"
-#include "MCH/MuonChambersMapping.h"
-#include "MCHMappingFactory/CreateSegmentation.h"
-#include "MCH/MuonChambersDataDecoder.h"
+#include "MCH/Mapping.h"
+#include "MCH/Decoding.h"
 #include "MCHBase/Digit.h"
 
 class TH1F;
@@ -19,24 +16,19 @@ class TH2F;
 
 using namespace o2::quality_control::core;
 
-namespace o2
-{
-namespace quality_control_modules
-{
-namespace muonchambers
+namespace o2::quality_control_modules::muonchambers
 {
 
-/// \brief Example Quality Control DPL Task
-/// It is final because there is no reason to derive from it. Just remove it if needed.
-/// \author Barthelemy von Haller
-/// \author Piotr Konopka
-class RawDataProcessor /*final*/ : public TaskInterface // todo add back the "final" when doxygen is fixed
+/// \brief Quality Control Task for the analysis of MCH pedestal data
+/// \author Andrea Ferrero
+/// \author Sebastien Perrin
+class PedestalsTask final : public TaskInterface
 {
-public:
+ public:
   /// \brief Constructor
-  RawDataProcessor();
+  PedestalsTask();
   /// Destructor
-  ~RawDataProcessor() override;
+  ~PedestalsTask() override;
 
   // Definition of the methods for the template method pattern
   void initialize(o2::framework::InitContext& ctx) override;
@@ -44,14 +36,13 @@ public:
   void startOfCycle() override;
   void monitorDataReadout(o2::framework::ProcessingContext& ctx);
   void monitorDataDigits(const o2::framework::DataRef& input);
-  void monitorData(o2::framework::ProcessingContext& ctx);
+  void monitorData(o2::framework::ProcessingContext& ctx) override;
   void endOfCycle() override;
   void endOfActivity(Activity& activity) override;
   void reset() override;
 
-private:
-  int count;
-  MuonChambersDataDecoder mDecoder;
+ private:
+  Decoder mDecoder;
   uint64_t nhits[MCH_MAX_CRU_IN_FLP][24][40][64];
   double pedestal[MCH_MAX_CRU_IN_FLP][24][40][64];
   double noise[MCH_MAX_CRU_IN_FLP][24][40][64];
@@ -63,16 +54,14 @@ private:
   double noiseDigits[1100][1500];
 
   MapCRU mMapCRU[MCH_MAX_CRU_IN_FLP];
-  TH1F* mHistogram;
   TH2F* mHistogramPedestals[MCH_MAX_CRU_IN_FLP * 24];
   TH2F* mHistogramNoise[MCH_MAX_CRU_IN_FLP * 24];
-  TH1F* mHistogramPedestalsDS[MCH_MAX_CRU_IN_FLP * 24][8];
-  TH1F* mHistogramNoiseDS[MCH_MAX_CRU_IN_FLP * 24][8];
 
   std::vector<int> DEs;
   //MapFEC mMapFEC;
   std::map<int, TH2F*> mHistogramPedestalsDE;
   std::map<int, TH2F*> mHistogramNoiseDE;
+  std::map<int, TH1F*> mHistogramDeltaDE[2];
   std::map<int, TH2F*> mHistogramPedestalsXY[2];
   std::map<int, TH2F*> mHistogramNoiseXY[2];
 
@@ -84,8 +73,6 @@ private:
   void save_histograms();
 };
 
-} // namespace muonchambers
-} // namespace quality_control_modules
 } // namespace o2
 
-#endif // QC_MODULE_MUONCHAMBERS_RAWDATAPROCESSOR_H
+#endif // QC_MODULE_MUONCHAMBERS_PEDESTALSTASK_H

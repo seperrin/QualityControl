@@ -3,19 +3,19 @@ set(MODULE_NAME "QcMuonChambers")
 # ---- Files ----
 
 set(SRCS
-  src/MuonChambersMapping.cxx
-  src/MuonChambersDataDecoder.cxx
-  src/RawDataProcessor.cxx
-  src/PhysicsDataProcessor.cxx
-  src/MCHCheckPedestals.cxx
+  src/Mapping.cxx
+  src/Decoding.cxx
+  src/PedestalsTask.cxx
+  src/PhysicsTask.cxx
+  src/PedestalsCheck.cxx
 )
 
 set(HEADERS
-  include/MCH/MuonChambersMapping.h
-  include/MCH/MuonChambersDataDecoder.h
-  include/MCH/RawDataProcessor.h
-  include/MCH/PhysicsDataProcessor.h
-  include/MCH/MCHCheckPedestals.h
+  include/MCH/Mapping.h
+  include/MCH/Decoding.h
+  include/MCH/PedestalsTask.h
+  include/MCH/PhysicsTask.h
+  include/MCH/PedestalsCheck.h
 )
 
 # ---- Library ----
@@ -28,8 +28,10 @@ target_include_directories(
   PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-#target_link_libraries(${MODULE_NAME} PUBLIC QualityControl)
-target_link_libraries(${MODULE_NAME} PUBLIC QualityControl O2::CommonDataFormat O2::GPUCommon O2::MCHMappingFactory O2::MCHMappingImpl3 O2::MCHMappingSegContour)
+target_link_libraries(${MODULE_NAME} PUBLIC QualityControl O2::CommonDataFormat O2::GPUCommon 
+        $<TARGET_NAME_IF_EXISTS:O2::MCHMappingFactory> O2::MCHMappingImpl3 O2::MCHMappingSegContour O2::MCHRawDecoder O2::MCHPreClustering)
+
+target_compile_definitions(${MODULE_NAME} PRIVATE $<$<TARGET_EXISTS:O2::MCHMappingFactory>:MCH_HAS_MAPPING_FACTORY>)
 
 install(
         TARGETS ${MODULE_NAME}
@@ -40,17 +42,14 @@ install(
 
 # ---- ROOT dictionary ----
 
-#generate_root_dict(MODULE_NAME ${MODULE_NAME} LINKDEF "include/MCH/LinkDef.h" DICT_CLASS "${MODULE_NAME}Dict")
-
 add_root_dictionary(${MODULE_NAME}
-                    HEADERS include/MCH/MuonChambersMapping.h
-                            include/MCH/MuonChambersDataDecoder.h
-                            include/MCH/RawDataProcessor.h
-                            include/MCH/PhysicsDataProcessor.h
-                            include/MCH/MCHCheckPedestals.h
+                    HEADERS include/MCH/Mapping.h
+                            include/MCH/Decoding.h
+                            include/MCH/PedestalsTask.h
+                            include/MCH/PhysicsTask.h
+                            include/MCH/PedestalsCheck.h
                             include/MCH/sampa_header.h
-                    LINKDEF include/MCH/LinkDef.h
-                    BASENAME ${MODULE_NAME})
+                    LINKDEF include/MCH/LinkDef.h)
 
 # ---- Tests ----
 
