@@ -8,9 +8,12 @@
 #ifndef QC_MODULE_MUONCHAMBERS_PHYSICSTASK_H
 #define QC_MODULE_MUONCHAMBERS_PHYSICSTASK_H
 
+#include <TRandom3.h>
+
 #include "QualityControl/TaskInterface.h"
 #include "MCH/Mapping.h"
 #include "MCH/Decoding.h"
+#include "MCH/GlobalHistogram.h"
 #include "MCHBase/Digit.h"
 #include "MCHBase/PreCluster.h"
 
@@ -54,6 +57,7 @@ class PhysicsTask /*final*/ : public TaskInterface // todo add back the "final" 
 
   void plotDigit(const o2::mch::Digit& digit);
   void plotPrecluster(const o2::mch::PreCluster& preCluster, gsl::span<const o2::mch::Digit> digits);
+  void checkPreclusters(gsl::span<const o2::mch::PreCluster> preClusters, gsl::span<const o2::mch::Digit> digits);
 
  private:
   int count;
@@ -75,6 +79,11 @@ class PhysicsTask /*final*/ : public TaskInterface // todo add back the "final" 
   std::map<int, TH1F*> mHistogramClsizeDE;
 
   std::map<int, TH2F*> mHistogramPreclustersXY[4];
+  std::map<int, TH2F*> mHistogramPseudoeffXY[3];
+  TRandom3 rnd;
+
+
+  GlobalHistogram* mHistogramPseudoeff[3];
 
 
   int mPrintLevel;
