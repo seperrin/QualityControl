@@ -602,7 +602,7 @@ void PhysicsTask::checkPreclusters(gsl::span<const o2::mch::PreCluster> preClust
           bool bend = !segment.isBendingPad(d.getPadID());
           std::cout << fmt::format("  DE {:4d}  PAD {:5d}  ADC {:6d}  TIME ({} {} {:4d})",
               d.getDetID(), d.getPadID(), d.getADC(), d.getTime().orbit, d.getTime().bunchCrossing, d.getTimeStamp());
-          std::cout << fmt::format("\t  CATHODE {}  PAD_XY {:+2.2f} , {:+2.2f}", (int)bend, X, Y);
+          std::cout << fmt::format("  CATHODE {}  PAD_XY {:+2.2f} , {:+2.2f}", (int)bend, X, Y);
           std::cout << std::endl;
         }
       }
