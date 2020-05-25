@@ -1,0 +1,12 @@
+<map id="Modules/TOF/src/TaskDiagnostics.cxx" name="Modules/TOF/src/TaskDiagnostics.cxx">
+<area shape="rect" id="node6" href="$QcInfoLogger_8h.html" title="QualityControl/QcInfoLogger.h" alt="" coords="318,326,517,353"/>
+<area shape="rect" id="node8" href="$TaskDiagnostics_8h.html" title="TOF/TaskDiagnostics.h" alt="" coords="259,80,421,107"/>
+<area shape="rect" id="node9" href="$TaskInterface_8h.html" title="QualityControl/TaskInterface.h" alt="" coords="1103,155,1303,181"/>
+<area shape="rect" id="node26" href="$Diagnostics_8h.html" title="TOF/Diagnostics.h" alt="" coords="267,155,399,181"/>
+<area shape="rect" id="node16" href="$Activity_8h.html" title="QualityControl/Activity.h" alt="" coords="1826,237,1990,263"/>
+<area shape="rect" id="node17" href="$ObjectsManager_8h.html" title="QualityControl/ObjectsManager.h" alt="" coords="1095,237,1310,263"/>
+<area shape="rect" id="node18" href="$MonitorObject_8h.html" title="QualityControl/MonitorObject.h" alt="" coords="818,326,1019,353"/>
+<area shape="rect" id="node22" href="$MonitorObjectCollection_8h.html" title="QualityControl/MonitorObject\lCollection.h" alt="" coords="1407,319,1598,360"/>
+<area shape="rect" id="node25" href="$TaskConfig_8h.html" title="QualityControl/TaskConfig.h" alt="" coords="1145,326,1332,353"/>
+<area shape="rect" id="node28" href="$Counter_8h.html" title="Base/Counter.h" alt="" coords="497,237,610,263"/>
+</map>

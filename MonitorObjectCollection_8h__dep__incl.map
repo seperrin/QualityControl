@@ -1,0 +1,65 @@
+<map id="Framework/include/QualityControl/MonitorObjectCollection.h" name="Framework/include/QualityControl/MonitorObjectCollection.h">
+<area shape="rect" id="node2" href="$ObjectsManager_8h.html" title="Framework/include/Quality\lControl/ObjectsManager.h" alt="" coords="5845,95,6023,136"/>
+<area shape="rect" id="node71" href="$ObjectsManager_8cxx.html" title="Framework/src/ObjectsManager.cxx" alt="" coords="6188,191,6421,218"/>
+<area shape="rect" id="node74" href="$MonitorObjectCollection_8cxx.html" title="Framework/src/MonitorObject\lCollection.cxx" alt="" coords="6261,95,6455,136"/>
+<area shape="rect" id="node3" href="$TaskInterface_8h.html" title="Framework/include/Quality\lControl/TaskInterface.h" alt="" coords="5987,184,6164,225"/>
+<area shape="rect" id="node73" href="$testPublisher_8cxx.html" title="Framework/test/testPublisher.cxx" alt="" coords="5743,191,5962,218"/>
+<area shape="rect" id="node4" href="$TaskFactory_8h.html" title="Framework/include/Quality\lControl/TaskFactory.h" alt="" coords="2933,273,3111,315"/>
+<area shape="rect" id="node7" href="$testTaskInterface_8cxx.html" title="Framework/test/testTaskInterface.cxx" alt="" coords="2103,370,2347,397"/>
+<area shape="rect" id="node18" href="$TaskRunner_8h.html" title="Framework/include/Quality\lControl/TaskRunner.h" alt="" coords="785,273,963,315"/>
+<area shape="rect" id="node25" href="$TaskInterface_8cxx.html" title="Framework/src/TaskInterface.cxx" alt="" coords="4143,281,4362,307"/>
+<area shape="rect" id="node26" href="$DaqTask_8h.html" title="Modules/Daq/include\l/Daq/DaqTask.h" alt="" coords="4709,273,4853,315"/>
+<area shape="rect" id="node29" href="$EMCAL_2include_2EMCAL_2DigitsQcTask_8h_source.html" title="Modules/EMCAL/include\l/EMCAL/DigitsQcTask.h" alt="" coords="4948,273,5115,315"/>
+<area shape="rect" id="node31" href="$EMCAL_2include_2EMCAL_2RawTask_8h_source.html" title="Modules/EMCAL/include\l/EMCAL/RawTask.h" alt="" coords="5157,273,5324,315"/>
+<area shape="rect" id="node33" href="$BenchmarkTask_8h.html" title="Modules/Example/include\l/Example/BenchmarkTask.h" alt="" coords="5357,273,5543,315"/>
+<area shape="rect" id="node35" href="$ExampleCondition_8h.html" title="Modules/Example/include\l/Example/ExampleCondition.h" alt="" coords="5583,273,5781,315"/>
+<area shape="rect" id="node37" href="$ExampleTask_8h.html" title="Modules/Example/include\l/Example/ExampleTask.h" alt="" coords="1903,273,2075,315"/>
+<area shape="rect" id="node39" href="$ITSRawTask_8h.html" title="ITS QC task for raw data analysis. " alt="" coords="5811,273,5953,315"/>
+<area shape="rect" id="node41" href="$BasicClusterQcTask_8h.html" title="Modules/MFT/include\l/MFT/BasicClusterQcTask.h" alt="" coords="5981,273,6170,315"/>
+<area shape="rect" id="node43" href="$BasicDigitQcTask_8h.html" title="Modules/MFT/include\l/MFT/BasicDigitQcTask.h" alt="" coords="6201,273,6376,315"/>
+<area shape="rect" id="node45" href="$BasicTrackQcTask_8h.html" title="Modules/MFT/include\l/MFT/BasicTrackQcTask.h" alt="" coords="6411,273,6591,315"/>
+<area shape="rect" id="node47" href="$Decoding_8h.html" title="Modules/MUON/MCH/include\l/MCH/Decoding.h" alt="" coords="6932,363,7128,404"/>
+<area shape="rect" id="node48" href="$PedestalsTask_8h.html" title="Modules/MUON/MCH/include\l/MCH/PedestalsTask.h" alt="" coords="6599,452,6795,493"/>
+<area shape="rect" id="node50" href="$PhysicsTask_8h.html" title="Modules/MUON/MCH/include\l/MCH/PhysicsTask.h" alt="" coords="7093,452,7289,493"/>
+<area shape="rect" id="node53" href="$Mapping_8h_source.html" title="Modules/MUON/MCH/include\l/MCH/Mapping.h" alt="" coords="6723,273,6919,315"/>
+<area shape="rect" id="node55" href="$PHOS_2include_2PHOS_2DigitsQcTask_8h_source.html" title="Modules/PHOS/include\l/PHOS/DigitsQcTask.h" alt="" coords="7263,273,7421,315"/>
+<area shape="rect" id="node57" href="$PHOS_2include_2PHOS_2RawTask_8h_source.html" title="Modules/PHOS/include\l/PHOS/RawTask.h" alt="" coords="7472,273,7631,315"/>
+<area shape="rect" id="node59" href="$SkeletonTask_8h.html" title="Modules/Skeleton/include\l/Skeleton/SkeletonTask.h" alt="" coords="4387,273,4559,315"/>
+<area shape="rect" id="node61" href="$TaskDiagnostics_8h.html" title="Modules/TOF/include\l/TOF/TaskDiagnostics.h" alt="" coords="7706,273,7871,315"/>
+<area shape="rect" id="node63" href="$TOFTask_8h.html" title="Modules/TOF/include\l/TOF/TOFTask.h" alt="" coords="7957,273,8103,315"/>
+<area shape="rect" id="node65" href="$TOFTaskCompressed_8h.html" title="Modules/TOF/include\l/TOF/TOFTaskCompressed.h" alt="" coords="8195,273,8391,315"/>
+<area shape="rect" id="node67" href="$PID_8h.html" title="Modules/TPC/include\l/TPC/PID.h" alt="" coords="8478,273,8625,315"/>
+<area shape="rect" id="node69" href="$Tracks_8h.html" title="Modules/TPC/include\l/TPC/Tracks.h" alt="" coords="8699,273,8846,315"/>
+<area shape="rect" id="node5" href="$TaskFactory_8cxx.html" title="Framework/src/TaskFactory.cxx" alt="" coords="2617,370,2827,397"/>
+<area shape="rect" id="node6" href="$TaskRunner_8cxx.html" title="Framework/src/TaskRunner.cxx" alt="" coords="1516,370,1725,397"/>
+<area shape="rect" id="node8" href="$testEMCAL_8cxx.html" title="Modules/EMCAL/test\l/testEMCAL.cxx" alt="" coords="2851,363,2998,404"/>
+<area shape="rect" id="node10" href="$testQcExample_8cxx.html" title="Modules/Example/test\l/testQcExample.cxx" alt="" coords="1926,363,2078,404"/>
+<area shape="rect" id="node11" href="$testITS_8cxx.html" title="Modules/ITS/test/testITS.cxx" alt="" coords="3022,370,3217,397"/>
+<area shape="rect" id="node13" href="$testMuonChambers_8cxx.html" title="Modules/MUON/MCH/test\l/testMuonChambers.cxx" alt="" coords="3488,363,3665,404"/>
+<area shape="rect" id="node15" href="$testQcSkeleton_8cxx.html" title="Modules/Skeleton/test\l/testQcSkeleton.cxx" alt="" coords="4095,363,4247,404"/>
+<area shape="rect" id="node16" href="$testTOF_8cxx.html" title="Modules/TOF/test/testTOF.cxx" alt="" coords="3867,370,4071,397"/>
+<area shape="rect" id="node20" href="$CheckRunner_8cxx.html" title="Framework/src/CheckRunner.cxx" alt="" coords="1101,370,1319,397"/>
+<area shape="rect" id="node21" href="$InfrastructureGenerator_8cxx.html" title="Framework/src/Infrastructure\lGenerator.cxx" alt="" coords="5,363,196,404"/>
+<area shape="rect" id="node22" href="$runBasic_8cxx.html" title="This is an executable showing QC Task&#39;s usage in Data Processing Layer. " alt="" coords="221,370,410,397"/>
+<area shape="rect" id="node23" href="$TaskRunnerFactory_8cxx.html" title="Framework/src/TaskRunner\lFactory.cxx" alt="" coords="434,363,618,404"/>
+<area shape="rect" id="node24" href="$testTaskRunner_8cxx.html" title="Framework/test/testTaskRunner.cxx" alt="" coords="642,370,877,397"/>
+<area shape="rect" id="node27" href="$DaqTask_8cxx.html" title="Modules/Daq/src/DaqTask.cxx" alt="" coords="4445,370,4647,397"/>
+<area shape="rect" id="node28" href="$testQcDaq_8cxx.html" title="Modules/Daq/test/testQcDaq.cxx" alt="" coords="4672,370,4889,397"/>
+<area shape="rect" id="node34" href="$BenchmarkTask_8cxx.html" title="Modules/Example/src\l/BenchmarkTask.cxx" alt="" coords="5372,363,5520,404"/>
+<area shape="rect" id="node36" href="$ExampleCondition_8cxx.html" title="Modules/Example/src\l/ExampleCondition.cxx" alt="" coords="5545,363,5702,404"/>
+<area shape="rect" id="node38" href="$ExampleTask_8cxx.html" title="Modules/Example/src\l/ExampleTask.cxx" alt="" coords="1344,363,1492,404"/>
+<area shape="rect" id="node40" href="$ITSRawTask_8cxx.html" title="ITS QC task for raw data analysis. " alt="" coords="5726,370,5950,397"/>
+<area shape="rect" id="node42" href="$BasicClusterQcTask_8cxx.html" title="Modules/MFT/src/BasicCluster\lQcTask.cxx" alt="" coords="5974,363,6177,404"/>
+<area shape="rect" id="node44" href="$BasicDigitQcTask_8cxx.html" title="Modules/MFT/src/BasicDigit\lQcTask.cxx" alt="" coords="6201,363,6389,404"/>
+<area shape="rect" id="node46" href="$BasicTrackQcTask_8cxx.html" title="Modules/MFT/src/BasicTrack\lQcTask.cxx" alt="" coords="6414,363,6609,404"/>
+<area shape="rect" id="node52" href="$Decoding_8cxx.html" title="Modules/MUON/MCH/src\l/Decoding.cxx" alt="" coords="6895,452,7069,493"/>
+<area shape="rect" id="node49" href="$PedestalsTask_8cxx.html" title="Modules/MUON/MCH/src\l/PedestalsTask.cxx" alt="" coords="6610,541,6783,583"/>
+<area shape="rect" id="node51" href="$PhysicsTask_8cxx.html" title="Modules/MUON/MCH/src\l/PhysicsTask.cxx" alt="" coords="7105,541,7278,583"/>
+<area shape="rect" id="node54" href="$Mapping_8cxx.html" title="Modules/MUON/MCH/src\l/Mapping.cxx" alt="" coords="6734,363,6907,404"/>
+<area shape="rect" id="node60" href="$SkeletonTask_8cxx.html" title="Modules/Skeleton/src\l/SkeletonTask.cxx" alt="" coords="4272,363,4420,404"/>
+<area shape="rect" id="node62" href="$TaskDiagnostics_8cxx.html" title="Modules/TOF/src/TaskDiagnostics.cxx" alt="" coords="7714,370,7965,397"/>
+<area shape="rect" id="node64" href="$TOFTask_8cxx.html" title="Modules/TOF/src/TOFTask.cxx" alt="" coords="7989,370,8196,397"/>
+<area shape="rect" id="node66" href="$TOFTaskCompressed_8cxx.html" title="Modules/TOF/src/TOFTaskCompressed.cxx" alt="" coords="8220,370,8501,397"/>
+<area shape="rect" id="node68" href="$PID_8cxx.html" title="Modules/TPC/src/PID.cxx" alt="" coords="8526,370,8702,397"/>
+<area shape="rect" id="node70" href="$Tracks_8cxx.html" title="Modules/TPC/src/Tracks.cxx" alt="" coords="8727,370,8920,397"/>
+</map>
