@@ -69,6 +69,7 @@ void TaskRunner::init(InitContext& iCtx)
   std::string monitoringUrl = mConfigFile->get<std::string>("qc.config.monitoring.url", "infologger:///debug?qc"); // "influxdb-udp://aido2mon-gpn.cern.ch:8087"
   mCollector = MonitoringFactory::Get(monitoringUrl);
   mCollector->enableProcessMonitoring();
+  mCollector->addGlobalTag(tags::Key::Subsystem, tags::Value::QC);
 
   // setup publisher
   mObjectsManager = std::make_shared<ObjectsManager>(mTaskConfig);
@@ -101,7 +102,7 @@ void TaskRunner::run(ProcessingContext& pCtx)
 
   if (dataReady) {
     mTask->monitorData(pCtx);
-    mNumberBlocks++;
+    mNumberMessages++;
   }
 
   if (timerReady) {
@@ -324,7 +325,10 @@ std::string TaskRunner::validateDetectorName(std::string name)
 
 void TaskRunner::startOfActivity()
 {
+  // stats
   mTimerTotalDurationActivity.reset();
+  mTotalNumberObjectsPublished = 0;
+
   Activity activity(mConfigFile->get<int>("qc.config.Activity.number"),
                     mConfigFile->get<int>("qc.config.Activity.type"));
   mTask->startOfActivity(activity);
@@ -339,14 +343,14 @@ void TaskRunner::endOfActivity()
   mObjectsManager->removeAllFromServiceDiscovery();
 
   double rate = mTotalNumberObjectsPublished / mTimerTotalDurationActivity.getTime();
-  mCollector->send({ rate, "QC_task_Rate_objects_published_per_second_whole_run" });
+  mCollector->send(Metric{ "qc_objects_published" }.addValue(rate, "per_second_whole_run"));
 }
 
 void TaskRunner::startCycle()
 {
   QcInfoLogger::GetInstance() << "cycle " << mCycleNumber << " in " << mTaskConfig.taskName << AliceO2::InfoLogger::InfoLogger::endm;
   mTask->startOfCycle();
-  mNumberBlocks = 0;
+  mNumberMessages = 0;
   mNumberObjectsPublishedInCycle = 0;
   mTimerDurationCycle.reset();
   mCycleOn = true;
@@ -378,15 +382,19 @@ void TaskRunner::publishCycleStats()
   double wholeRunRate = mTotalNumberObjectsPublished / mTimerTotalDurationActivity.getTime();
   double totalDurationActivity = mTimerTotalDurationActivity.getTime();
 
+  mCollector->send({ mNumberMessages, "qc_messages_received_in_cycle" });
+
   // monitoring metrics
-  mCollector->send({ mNumberBlocks, "QC_task_Numberofblocks_in_cycle" });
-  mCollector->send({ cycleDuration, "QC_task_Module_cycle_duration" });
-  mCollector->send({ mLastPublicationDuration, "QC_task_Publication_duration" });
-  mCollector->send({ mNumberObjectsPublishedInCycle, "QC_task_Number_objects_published_in_cycle" });
-  mCollector->send({ rate, "QC_task_Rate_objects_published_per_second" });
-  mCollector->send({ mTotalNumberObjectsPublished, "QC_task_Total_objects_published_whole_run" });
-  mCollector->send({ totalDurationActivity, "QC_task_Total_duration_activity_whole_run" });
-  mCollector->send({ wholeRunRate, "QC_task_Rate_objects_published_per_second_whole_run" });
+  mCollector->send(Metric{ "qc_duration" }
+                     .addValue(cycleDuration, "module_cycle")
+                     .addValue(mLastPublicationDuration, "publication")
+                     .addValue(totalDurationActivity, "activity_whole_run"));
+
+  mCollector->send(Metric{ "qc_objects_published" }
+                     .addValue(mNumberObjectsPublishedInCycle, "in_cycle")
+                     .addValue(rate, "per_second")
+                     .addValue(mTotalNumberObjectsPublished, "whole_run")
+                     .addValue(wholeRunRate, "per_second_whole_run"));
 }
 
 int TaskRunner::publish(DataAllocator& outputs)

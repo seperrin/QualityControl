@@ -43,7 +43,6 @@ class Quality
   static const Quality Good;
   static const Quality Medium;
   static const Quality Bad;
-  static const Quality BadAndMissing;
   static const unsigned int NullLevel;
 
   friend bool operator==(const Quality& lhs, const Quality& rhs)
