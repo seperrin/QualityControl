@@ -49,7 +49,6 @@ add_library(QualityControl
             src/TaskRunnerFactory.cxx
             src/TaskInterface.cxx
             src/RepositoryBenchmark.cxx
-            src/HistoMerger.cxx
             src/InfrastructureGenerator.cxx
             src/Check.cxx
             src/ServiceDiscovery.cxx
@@ -63,7 +62,8 @@ add_library(QualityControl
             src/TrendingTaskConfig.cxx
             src/DummyDatabase.cxx
             src/DataProducer.cxx
-            src/DataProducerExample.cxx)
+            src/DataProducerExample.cxx
+            src/MonitorObjectCollection.cxx)
 
 if(ENABLE_MYSQL)
   target_sources(QualityControl PRIVATE src/MySqlDatabase.cxx)
@@ -95,6 +95,7 @@ target_link_libraries(QualityControl
                              O2::MCHClustering
                              ms_gsl::ms_gsl
                              QualityControlTypes
+                             O2::Mergers
                       PRIVATE Boost::system
                               $<$<BOOL:${ENABLE_MYSQL}>:MySQL::MySQL>
                               $<$<BOOL:${ENABLE_MYSQL}>:ROOT::RMySQL> ROOT::Gui
@@ -113,12 +114,12 @@ add_root_dictionary(QualityControl
                             include/QualityControl/ServiceDiscovery.h
                             include/QualityControl/TaskRunner.h
                             include/QualityControl/TaskRunnerFactory.h
-                            include/QualityControl/HistoMerger.h
                             include/QualityControl/InfrastructureGenerator.h
                             include/QualityControl/InputUtils.h
                             include/QualityControl/PostProcessingInterface.h
                             include/QualityControl/TrendingTask.h
                             include/QualityControl/Reductor.h
+                            include/QualityControl/MonitorObjectCollection.h
                     LINKDEF include/QualityControl/LinkDef.h
                     BASENAME QualityControl)
 
@@ -126,13 +127,11 @@ add_root_dictionary(QualityControl
 
 set(EXE_SRCS
     src/runDataProducer.cxx
-    src/runFileReader.cxx
     src/runDataProducerExample.cxx
     src/runQC.cxx
     src/runBasic.cxx
     src/runAdvanced.cxx
     src/runReadout.cxx
-    src/runMergerTest.cxx
     src/runReadoutForDataDump.cxx
     src/runRepositoryBenchmark.cxx
     src/runPostProcessing.cxx
@@ -140,13 +139,11 @@ set(EXE_SRCS
 
 set(EXE_NAMES
     o2-qc-run-producer
-    o2-qc-run-file-reader
     o2-qc-run-producer-basic
     o2-qc
     o2-qc-run-basic
     o2-qc-run-advanced
     o2-qc-run-readout
-    o2-qc-run-merger-test
     o2-qc-run-readout-for-data-dump
     o2-qc-repository-benchmark
     o2-qc-run-postprocessing
@@ -156,13 +153,11 @@ set(EXE_NAMES
 # of them but for the time being we want to create symlinks to avoid confusion.
 set(EXE_OLD_NAMES
     qcRunProducer
-    qcRunFileReader
     o2-qc-run-producer-basic
     o2-qc-run-qc
     qcRunBasic
     qcRunAdvanced
     qcRunReadout
-    runMergerTest
     qcRunReadoutForDataDump
     repositoryBenchmark
     qcRunPostProcessing
@@ -302,9 +297,9 @@ endforeach()
 target_include_directories(testVersion PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>)
 target_include_directories(testCcdbDatabase PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>)
 
-set_property(TEST testWorkflow PROPERTY TIMEOUT 10)
+set_property(TEST testWorkflow PROPERTY TIMEOUT 20)
 set_property(TEST testWorkflow PROPERTY LABELS slow)
-set_property(TEST testCheckWorkflow PROPERTY TIMEOUT 10)
+set_property(TEST testCheckWorkflow PROPERTY TIMEOUT 20)
 set_property(TEST testCheckWorkflow PROPERTY LABELS slow)
 set_property(TEST testObjectsManager PROPERTY TIMEOUT 20)
 set_property(TEST testObjectsManager PROPERTY LABELS slow)
@@ -374,6 +369,7 @@ install(FILES example-default.json
               basic.json
               basic-no-sampling.json
               advanced.json
+              multiNode.json
               readout.json
               readout-no-sampling.json
               readoutForDataDump.json
