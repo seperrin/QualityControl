@@ -887,14 +887,26 @@ void Decoder::initialize()
     }
   }
 
+  mMapCRU.readMapping("cru.map");
+  mMapFEC.readDSMapping("fec.map");
+
   fprintf(stdout, "initialize ds_enable\n");
   for (int c = 0; c < MCH_MAX_CRU_IN_FLP; c++) {
     for (int l = 0; l < 24; l++) {
-      for (int i = 0; i < 40; i++) {
-        ds_enable[c][l][i] = 1;
+      int32_t link_id = mMapCRU.getLink(c, l);
+      if (link_id < 0) {
+        for (int i = 0; i < 40; i++) {
+          ds_enable[c][l][i] = 0;
+        }
+      } else {
+        for (int i = 0; i < 40; i++) {
+          uint32_t de, dsid;
+          ds_enable[c][l][i] = mMapFEC.getDSMapping(link_id, i, de, dsid) ? 1 : 0;
+        }
       }
     }
   }
+  /*
   std::ifstream ds_enable_f("/tmp/board_enable.txt");
   fprintf(stdout, "Reading /tmp/board_enable.txt");
   while (!ds_enable_f.fail()) {
@@ -909,11 +921,9 @@ void Decoder::initialize()
     ds_enable[c][l][b] = e;
     fprintf(stdout, "ds_enable[%d][%d][%d]=%d\n", c, l, b, ds_enable[c][l][b]);
   }
+  */
 
-  mMapCRU.readMapping("cru.map");
-  mMapFEC.readDSMapping("fec.map");
-
-  gPrintLevel = 0;
+  gPrintLevel = 1;
 
   //if( gPrintLevel > 0 ) flog = fopen("/home/flp/qc.log", "w");
   //else

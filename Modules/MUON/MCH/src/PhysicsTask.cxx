@@ -27,8 +27,6 @@ using namespace std;
 
 #define QC_MCH_SAVE_TEMP_ROOTFILE 1
 
-static int gPrintLevel;
-
 static FILE* flog = NULL;
 
 struct CRUheader {
@@ -75,7 +73,7 @@ void PhysicsTask::initialize(o2::framework::InitContext& /*ctx*/)
 
   mDecoder.initialize();
 
-  mPrintLevel = 0;
+  mPrintLevel = 1;
 
   flog = stdout; //fopen("/root/qc.log", "w");
   fprintf(stdout, "PhysicsTask initialization finished\n");
@@ -218,22 +216,23 @@ void PhysicsTask::monitorDataReadout(o2::framework::ProcessingContext& ctx)
     if (payloadSize == 0)
       continue;
 
-    //std::cout<<"\n\npayloadSize: "<<payloadSize<<std::endl;
-    //std::cout<<"raw:     "<<(void*)raw<<std::endl;
-    //std::cout<<"payload: "<<(void*)payload<<std::endl;
-
+    if (mPrintLevel >= 1) {
+      std::cout<<"payloadSize: "<<payloadSize<<std::endl;
+      //std::cout<<"raw:     "<<(void*)raw<<std::endl;
+      //std::cout<<"payload: "<<(void*)payload<<std::endl;
+    }
 
     // Run the decoder on the CRU buffer
     mDecoder.processData((const char*)raw, (size_t)(payloadSize + sizeof(o2::header::RAWDataHeaderV4)));
   }
 
   std::vector<SampaHit>& hits = mDecoder.getHits();
-  if (gPrintLevel >= 1)
+  if (mPrintLevel >= 1)
     fprintf(flog, "hits.size()=%d\n", (int)hits.size());
   for (uint32_t i = 0; i < hits.size(); i++) {
     //continue;
     SampaHit& hit = hits[i];
-    if (gPrintLevel >= 1)
+    if (mPrintLevel >= 1)
       fprintf(stdout, "hit[%d]: link_id=%d, ds_addr=%d, chan_addr=%d\n",
           i, hit.link_id, hit.ds_addr, hit.chan_addr);
     if (hit.link_id >= 24 || hit.ds_addr >= 40 || hit.chan_addr >= 64) {
@@ -248,7 +247,7 @@ void PhysicsTask::monitorDataReadout(o2::framework::ProcessingContext& ctx)
   }
 
   std::vector<o2::mch::Digit>& digits = mDecoder.getDigits();
-  if (gPrintLevel >= 1)
+  if (mPrintLevel >= 1)
     fprintf(flog, "digits.size()=%d\n", (int)digits.size());
   for (uint32_t i = 0; i < digits.size(); i++) {
     o2::mch::Digit& digit = digits[i];
@@ -387,12 +386,14 @@ void PhysicsTask::monitorData(o2::framework::ProcessingContext& ctx)
   count += 1;
 #endif
 
+  QcInfoLogger::GetInstance() << "monitorData" << AliceO2::InfoLogger::InfoLogger::endm;
+  fprintf(flog, "\n================\nmonitorData\n================\n");
   monitorDataReadout(ctx);
   bool preclustersFound = false;
   bool preclusterDigitsFound = false;
   for (auto&& input : ctx.inputs()) {
     if (mPrintLevel >= 1) {
-      QcInfoLogger::GetInstance() << "run PedestalsTask: input " << input.spec->binding << AliceO2::InfoLogger::InfoLogger::endm;
+      QcInfoLogger::GetInstance() << "run PhysicsTask: input " << input.spec->binding << AliceO2::InfoLogger::InfoLogger::endm;
     }
     if (input.spec->binding == "digits") {
       monitorDataDigits(input);
@@ -433,7 +434,7 @@ void PhysicsTask::plotDigit(const o2::mch::Digit& digit)
     int cathode = segment.isBendingPad(padid) ? 0 : 1;
 
 
-    if (gPrintLevel >= 1)
+    if (mPrintLevel >= 1)
       fprintf(flog, "de=%d pad=%d x=%f y=%f\n", de, padid, padX, padY);
     //if(pad.fX>=32 && pad.fX<=34 && pad.fY>=1.1 && pad.fY<=1.4)
     //  fprintf(flog, "mapping: link_id=%d ds_addr=%d chan_addr=%d  ==>  de=%d x=%f y=%f A=%d\n",

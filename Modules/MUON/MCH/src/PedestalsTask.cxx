@@ -333,7 +333,7 @@ void PedestalsTask::save_histograms()
     }
   }
 
-  f.ls();
+  //f.ls();
   f.Close();
 }
 
