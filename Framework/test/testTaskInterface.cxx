@@ -16,6 +16,33 @@
 #include "QualityControl/TaskFactory.h"
 #include "QualityControl/TaskInterface.h"
 #include "QualityControl/QcInfoLogger.h"
+#include <Framework/ConfigParamRegistry.h>
+
+#if (__has_include(<Framework/ConfigParamStore.h>))
+#include <Framework/ConfigParamStore.h>
+o2::framework::ConfigParamRegistry createDummyRegistry()
+{
+  using namespace o2::framework;
+  std::vector<ConfigParamSpec> specs;
+  std::vector<std::unique_ptr<ParamRetriever>> retrievers;
+
+  auto store = std::make_unique<ConfigParamStore>(specs, std::move(retrievers));
+  store->preload();
+  store->activate();
+  ConfigParamRegistry registry(std::move(store));
+
+  return registry;
+}
+#else
+o2::framework::ConfigParamRegistry createDummyRegistry()
+{
+  using namespace o2::framework;
+  std::unique_ptr<ParamRetriever> retriever;
+  ConfigParamRegistry registry(move(retriever));
+
+  return registry;
+}
+#endif
 
 #define BOOST_TEST_MODULE TaskInterface test
 #define BOOST_TEST_MAIN
@@ -93,41 +120,40 @@ class TestTask : public TaskInterface
 } /* namespace test */
 } /* namespace o2::quality_control */
 
-//BOOST_AUTO_TEST_CASE(test_invoke_all_methods)
-//{
-//  // This is maximum that we can do until we are able to test the DPL algorithms in isolation.
-//  TaskConfig taskConfig;
-//  ObjectsManager* objectsManager = new ObjectsManager(taskConfig, true);
-//  test::TestTask testTask(objectsManager);
-//  BOOST_CHECK_EQUAL(testTask.test, 0);
-//
-//  std::unique_ptr<ParamRetriever> retriever;
-//  ConfigParamRegistry options(move(retriever));
-//  ServiceRegistry services;
-//  InitContext ctx(options, services);
-//  testTask.initialize(ctx);
-//  BOOST_CHECK_EQUAL(testTask.test, 1);
-//
-//  Activity act;
-//  testTask.startOfActivity(act);
-//  BOOST_CHECK_EQUAL(testTask.test, 2);
-//
-//  testTask.startOfCycle();
-//  BOOST_CHECK_EQUAL(testTask.test, 3);
-//
-//  // creating a valid ProcessingContex is almost impossible outside of the framework
-//  // testTask.monitorData(pctx);
-//  // BOOST_CHECK_EQUAL(testTask.test, 4);
-//
-//  testTask.endOfCycle();
-//  BOOST_CHECK_EQUAL(testTask.test, 5);
-//
-//  testTask.endOfActivity(act);
-//  BOOST_CHECK_EQUAL(testTask.test, 6);
-//
-//  testTask.reset();
-//  BOOST_CHECK_EQUAL(testTask.test, 7);
-//}
+BOOST_AUTO_TEST_CASE(test_invoke_all_methods)
+{
+  // This is maximum that we can do until we are able to test the DPL algorithms in isolation.
+  TaskConfig taskConfig;
+  ObjectsManager* objectsManager = new ObjectsManager(taskConfig, true);
+  test::TestTask testTask(objectsManager);
+  BOOST_CHECK_EQUAL(testTask.test, 0);
+
+  auto options = createDummyRegistry();
+  ServiceRegistry services;
+  InitContext ctx(options, services);
+  testTask.initialize(ctx);
+  BOOST_CHECK_EQUAL(testTask.test, 1);
+
+  Activity act;
+  testTask.startOfActivity(act);
+  BOOST_CHECK_EQUAL(testTask.test, 2);
+
+  testTask.startOfCycle();
+  BOOST_CHECK_EQUAL(testTask.test, 3);
+
+  // creating a valid ProcessingContex is almost impossible outside of the framework
+  // testTask.monitorData(pctx);
+  // BOOST_CHECK_EQUAL(testTask.test, 4);
+
+  testTask.endOfCycle();
+  BOOST_CHECK_EQUAL(testTask.test, 5);
+
+  testTask.endOfActivity(act);
+  BOOST_CHECK_EQUAL(testTask.test, 6);
+
+  testTask.reset();
+  BOOST_CHECK_EQUAL(testTask.test, 7);
+}
 
 BOOST_AUTO_TEST_CASE(test_task_factory)
 {

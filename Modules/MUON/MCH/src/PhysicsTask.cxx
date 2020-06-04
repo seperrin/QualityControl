@@ -406,6 +406,7 @@ void PhysicsTask::monitorData(o2::framework::ProcessingContext& ctx)
   count += 1;
 #endif
 
+  monitorDataReadout(ctx);
   bool preclustersFound = false;
   bool preclusterDigitsFound = false;
   for (auto&& input : ctx.inputs()) {
@@ -898,7 +899,7 @@ void PhysicsTask::endOfCycle()
 //    mHistogramOccupancy[1]->Write();
 //    mHistogramOccupancy[2]->Write();
 
-    f.ls();
+    //f.ls();
     f.Close();
 #endif
 }
