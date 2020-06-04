@@ -93,41 +93,41 @@ class TestTask : public TaskInterface
 } /* namespace test */
 } /* namespace o2::quality_control */
 
-BOOST_AUTO_TEST_CASE(test_invoke_all_methods)
-{
-  // This is maximum that we can do until we are able to test the DPL algorithms in isolation.
-  TaskConfig taskConfig;
-  ObjectsManager* objectsManager = new ObjectsManager(taskConfig, true);
-  test::TestTask testTask(objectsManager);
-  BOOST_CHECK_EQUAL(testTask.test, 0);
-
-  std::unique_ptr<ParamRetriever> retriever;
-  ConfigParamRegistry options(move(retriever));
-  ServiceRegistry services;
-  InitContext ctx(options, services);
-  testTask.initialize(ctx);
-  BOOST_CHECK_EQUAL(testTask.test, 1);
-
-  Activity act;
-  testTask.startOfActivity(act);
-  BOOST_CHECK_EQUAL(testTask.test, 2);
-
-  testTask.startOfCycle();
-  BOOST_CHECK_EQUAL(testTask.test, 3);
-
-  // creating a valid ProcessingContex is almost impossible outside of the framework
-  // testTask.monitorData(pctx);
-  // BOOST_CHECK_EQUAL(testTask.test, 4);
-
-  testTask.endOfCycle();
-  BOOST_CHECK_EQUAL(testTask.test, 5);
-
-  testTask.endOfActivity(act);
-  BOOST_CHECK_EQUAL(testTask.test, 6);
-
-  testTask.reset();
-  BOOST_CHECK_EQUAL(testTask.test, 7);
-}
+//BOOST_AUTO_TEST_CASE(test_invoke_all_methods)
+//{
+//  // This is maximum that we can do until we are able to test the DPL algorithms in isolation.
+//  TaskConfig taskConfig;
+//  ObjectsManager* objectsManager = new ObjectsManager(taskConfig, true);
+//  test::TestTask testTask(objectsManager);
+//  BOOST_CHECK_EQUAL(testTask.test, 0);
+//
+//  std::unique_ptr<ParamRetriever> retriever;
+//  ConfigParamRegistry options(move(retriever));
+//  ServiceRegistry services;
+//  InitContext ctx(options, services);
+//  testTask.initialize(ctx);
+//  BOOST_CHECK_EQUAL(testTask.test, 1);
+//
+//  Activity act;
+//  testTask.startOfActivity(act);
+//  BOOST_CHECK_EQUAL(testTask.test, 2);
+//
+//  testTask.startOfCycle();
+//  BOOST_CHECK_EQUAL(testTask.test, 3);
+//
+//  // creating a valid ProcessingContex is almost impossible outside of the framework
+//  // testTask.monitorData(pctx);
+//  // BOOST_CHECK_EQUAL(testTask.test, 4);
+//
+//  testTask.endOfCycle();
+//  BOOST_CHECK_EQUAL(testTask.test, 5);
+//
+//  testTask.endOfActivity(act);
+//  BOOST_CHECK_EQUAL(testTask.test, 6);
+//
+//  testTask.reset();
+//  BOOST_CHECK_EQUAL(testTask.test, 7);
+//}
 
 BOOST_AUTO_TEST_CASE(test_task_factory)
 {

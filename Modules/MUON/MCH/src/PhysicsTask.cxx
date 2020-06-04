@@ -177,6 +177,18 @@ void PhysicsTask::initialize(o2::framework::InitContext& /*ctx*/)
       hXY = new TH2F(TString::Format("QcMuonChambers_Pseudoeff_BNB_XY_%03d", de),
           TString::Format("QcMuonChambers - Pseudo-efficiency XY (DE%03d B+NB)", de), Xsize / scale, -Xsize2, Xsize2, Ysize / scale, -Ysize2, Ysize2);
       mHistogramPseudoeffXY[2].insert(make_pair(de, hXY));
+        
+      hXY = new TH2F(TString::Format("QcMuonChambers_Occupancy_B_XY_%03d", de),
+          TString::Format("QcMuonChambers - Occupancy XY (DE%03d B)", de), Xsize / scale, -Xsize2, Xsize2, Ysize / scale, -Ysize2, Ysize2);
+      mHistogramOccupancyXY[0].insert(make_pair(de, hXY));
+
+//      hXY = new TH2F(TString::Format("QcMuonChambers_Occupancy_NB_XY_%03d", de),
+//           TString::Format("QcMuonChambers - Occupancy XY (DE%03d NB)", de), Xsize / scale, -Xsize2, Xsize2, Ysize / scale, -Ysize2, Ysize2);
+//      mHistogramOccupancyXY[1].insert(make_pair(de, hXY));
+//
+//      hXY = new TH2F(TString::Format("QcMuonChambers_Occupancy_BNB_XY_%03d", de),
+//           TString::Format("QcMuonChambers - Occupancy XY (DE%03d B+NB)", de), Xsize / scale, -Xsize2, Xsize2, Ysize / scale, -Ysize2, Ysize2);
+//      mHistogramOccupancyXY[2].insert(make_pair(de, hXY));
     }
   }
 
@@ -186,6 +198,13 @@ void PhysicsTask::initialize(o2::framework::InitContext& /*ctx*/)
   mHistogramPseudoeff[1]->init();
   mHistogramPseudoeff[2] = new GlobalHistogram("QcMuonChambers_Pseudoeff_BNB", "Pseudo-efficiency - B+NB");
   mHistogramPseudoeff[2]->init();
+    
+  mHistogramOccupancy[0] = new GlobalHistogram("QcMuonChambers_Occupancy_den", "Occupancy");
+  mHistogramOccupancy[0]->init();
+//  mHistogramOccupancy[1] = new GlobalHistogram("QcMuonChambers_Occupancy", "Occupancy");
+//  mHistogramOccupancy[1]->init();
+//  mHistogramOccupancy[2] = new GlobalHistogram("QcMuonChambers_Occupancy_BNB", "Occupancy - B+NB");
+//  mHistogramOccupancy[2]->init();
 }
 
 void PhysicsTask::startOfActivity(Activity& /*activity*/)
@@ -403,7 +422,7 @@ void PhysicsTask::monitorData(o2::framework::ProcessingContext& ctx)
       preclusterDigitsFound = true;
     }
   }
-  //monitorDataReadout(ctx);
+//  monitorDataReadout(ctx);
   if(preclustersFound && preclusterDigitsFound) {
     monitorDataPreclusters(ctx);
   }
@@ -808,6 +827,13 @@ void PhysicsTask::endOfCycle()
       hEff->Add(hB);
       hEff->Divide(hAll);
     }
+    for(int i = 0; i < 1; i++) {
+        auto ih = mHistogramOccupancyXY[i+1].find(de);
+        ih = mHistogramOccupancyXY[i].find(de);
+        if (ih == mHistogramOccupancyXY[i].end()) {
+          continue;
+        }
+    }
   }
 
   mHistogramPseudoeff[0]->add(mHistogramPreclustersXY[0], mHistogramPreclustersXY[0]);
@@ -815,6 +841,10 @@ void PhysicsTask::endOfCycle()
   mHistogramPseudoeff[1]->Divide(mHistogramPseudoeff[0]);
   mHistogramPseudoeff[2]->add(mHistogramPreclustersXY[3], mHistogramPreclustersXY[3]);
   mHistogramPseudoeff[2]->Divide(mHistogramPseudoeff[0]);
+
+    mHistogramOccupancy[0]->add(mHistogramNhitsDE, mHistogramNhitsDE);
+//    mHistogramOccupancy[1]->add(mHistogramPreclustersXY[1], mHistogramPreclustersXY[2]);
+//    mHistogramOccupancy[2]->add(mHistogramPreclustersXY[3], mHistogramPreclustersXY[3]);
 
 #ifdef QC_MCH_SAVE_TEMP_ROOTFILE
     TFile f("/tmp/qc.root", "RECREATE");
@@ -863,6 +893,10 @@ void PhysicsTask::endOfCycle()
     mHistogramPseudoeff[0]->Write();
     mHistogramPseudoeff[1]->Write();
     mHistogramPseudoeff[2]->Write();
+    
+    mHistogramOccupancy[0]->Write();
+//    mHistogramOccupancy[1]->Write();
+//    mHistogramOccupancy[2]->Write();
 
     f.ls();
     f.Close();
