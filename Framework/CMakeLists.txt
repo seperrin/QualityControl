@@ -92,7 +92,6 @@ target_link_libraries(QualityControl
                              O2::CCDB
                              O2::MCHBase
                              O2::MCHPreClustering
-                             O2::MCHClustering
                              ms_gsl::ms_gsl
                              QualityControlTypes
                              O2::Mergers
