@@ -923,7 +923,7 @@ void Decoder::initialize()
   }
   */
 
-  gPrintLevel = 1;
+  gPrintLevel = 0;
 
   //if( gPrintLevel > 0 ) flog = fopen("/home/flp/qc.log", "w");
   //else
