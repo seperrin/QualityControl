@@ -8,6 +8,7 @@ set(SRCS
   src/GlobalHistogram.cxx
   src/PedestalsTask.cxx
   src/PhysicsTask.cxx
+  src/PhysicsTaskDigits.cxx
   src/PedestalsCheck.cxx
 )
 
@@ -17,6 +18,7 @@ set(HEADERS
   include/MCH/GlobalHistogram.h
   include/MCH/PedestalsTask.h
   include/MCH/PhysicsTask.h
+  include/MCH/PhysicsTaskDigits.h
   include/MCH/PedestalsCheck.h
 )
 
@@ -50,6 +52,7 @@ add_root_dictionary(${MODULE_NAME}
                             include/MCH/GlobalHistogram.h
                             include/MCH/PedestalsTask.h
                             include/MCH/PhysicsTask.h
+                            include/MCH/PhysicsTaskDigits.h
                             include/MCH/PedestalsCheck.h
                             include/MCH/sampa_header.h
                     LINKDEF include/MCH/LinkDef.h)
