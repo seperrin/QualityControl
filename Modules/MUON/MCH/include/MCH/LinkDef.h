@@ -8,5 +8,6 @@
 #pragma link C++ class o2::quality_control_modules::muonchambers::PedestalsTask + ;
 #pragma link C++ class o2::quality_control_modules::muonchambers::PhysicsTask + ;
 #pragma link C++ class o2::quality_control_modules::muonchambers::PhysicsTaskDigits + ;
+#pragma link C++ class o2::quality_control_modules::muonchambers::PhysicsTaskPreClusters + ;
 #pragma link C++ class o2::quality_control_modules::muonchambers::PedestalsCheck + ;
 #endif
