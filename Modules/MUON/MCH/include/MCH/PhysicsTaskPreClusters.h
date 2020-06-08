@@ -1,12 +1,12 @@
 ///
-/// \file   PhysicsTask.h
+/// \file   PhysicsTaskPreClusters.h
 /// \author Barthelemy von Haller
 /// \author Piotr Konopka
 /// \author Andrea Ferrero
 ///
 
-#ifndef QC_MODULE_MUONCHAMBERS_PHYSICSTASK_H
-#define QC_MODULE_MUONCHAMBERS_PHYSICSTASK_H
+#ifndef QC_MODULE_MUONCHAMBERS_PHYSICSTASKPRECLUSTERS_H
+#define QC_MODULE_MUONCHAMBERS_PHYSICSTASKPRECLUSTERS_H
 
 #include <TRandom3.h>
 
@@ -32,30 +32,24 @@ namespace muonchambers
 /// \brief Quality Control Task for the analysis of MCH physics data
 /// \author Andrea Ferrero
 /// \author Sebastien Perrin
-class PhysicsTask /*final*/ : public TaskInterface // todo add back the "final" when doxygen is fixed
+class PhysicsTaskPreClusters /*final*/ : public TaskInterface // todo add back the "final" when doxygen is fixed
 {
  public:
   /// \brief Constructor
-  PhysicsTask();
+  PhysicsTaskPreClusters();
   /// Destructor
-  ~PhysicsTask() override;
+  ~PhysicsTaskPreClusters() override;
 
   // Definition of the methods for the template method pattern
   void initialize(o2::framework::InitContext& ctx) override;
   void startOfActivity(Activity& activity) override;
   void startOfCycle() override;
-  void monitorDataReadout(o2::framework::ProcessingContext& ctx);
-  void monitorDataDigits(const o2::framework::DataRef& input);
   void monitorDataPreclusters(o2::framework::ProcessingContext& ctx);
   void monitorData(o2::framework::ProcessingContext& ctx) override;
   void endOfCycle() override;
   void endOfActivity(Activity& activity) override;
   void reset() override;
 
-  ssize_t getNumberOfDigits();
-  void storeDigits(void* bufferPtr);
-
-  void plotDigit(const o2::mch::Digit& digit);
   bool plotPrecluster(const o2::mch::PreCluster& preCluster, gsl::span<const o2::mch::Digit> digits);
   void checkPreclusters(gsl::span<const o2::mch::PreCluster> preClusters, gsl::span<const o2::mch::Digit> digits);
   void printPreclusters(gsl::span<const o2::mch::PreCluster> preClusters, gsl::span<const o2::mch::Digit> digits);
@@ -68,24 +62,16 @@ class PhysicsTask /*final*/ : public TaskInterface // todo add back the "final" 
   std::vector<std::unique_ptr<mch::Digit>> digits;
   mch::Digit* digitsBuffer;
   int nDigits;
-
-  TH2F* mHistogramNhits[72];
-  TH1F* mHistogramADCamplitude[72];
-  std::vector<int> DEs;
-  std::map<int, TH1F*> mHistogramADCamplitudeDE;
-  std::map<int, TH2F*> mHistogramNhitsDE;
-  std::map<int, TH2F*> mHistogramNhitsHighAmplDE;
+    std::vector<int> DEs;
 
   std::map<int, TH1F*> mHistogramClchgDE;
   std::map<int, TH1F*> mHistogramClsizeDE;
 
   std::map<int, TH2F*> mHistogramPreclustersXY[4];
   std::map<int, TH2F*> mHistogramPseudoeffXY[3];
-  std::map<int, TH2F*> mHistogramOccupancyXY[3];
   TRandom3 rnd;
 
   GlobalHistogram* mHistogramPseudoeff[3];
-  GlobalHistogram* mHistogramOccupancy[1];
 
   int mPrintLevel;
 };
@@ -95,3 +81,4 @@ class PhysicsTask /*final*/ : public TaskInterface // todo add back the "final" 
 } // namespace o2
 
 #endif // QC_MODULE_MUONCHAMBERS_PHYSICSDATAPROCESSOR_H
+
