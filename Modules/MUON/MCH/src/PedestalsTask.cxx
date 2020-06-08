@@ -350,8 +350,10 @@ void PedestalsTask::monitorDataReadout(o2::framework::ProcessingContext& ctx)
 
   for (auto it = parser.begin(), end = parser.end(); it != end; ++it) {
     // retrieving RDH v4
-    auto const* rdh = it.get_if<o2::header::RAWDataHeaderV4>();
-    if (!rdh)
+    //auto const* rdh = it.get_if<o2::header::RDHAny>();
+    auto const* rdh4 = it.get_if<o2::header::RAWDataHeaderV4>();
+    auto const* rdh6 = it.get_if<o2::header::RAWDataHeaderV6>();
+    if (!rdh4 && !rdh6)
       continue;
     // retrieving the raw pointer of the page
     auto const* raw = it.raw();
@@ -574,6 +576,8 @@ void PedestalsTask::monitorDataDigits(const o2::framework::DataRef& input)
 
 void PedestalsTask::monitorData(o2::framework::ProcessingContext& ctx)
 {
+  //QcInfoLogger::GetInstance() << "monitorDataReadout" << AliceO2::InfoLogger::InfoLogger::endm;
+  //fprintf(flog, "\n================\nmonitorDataReadout\n================\n");
   monitorDataReadout(ctx);
   for (auto&& input : ctx.inputs()) {
     //QcInfoLogger::GetInstance() << "run PedestalsTask: input " << input.spec->binding << AliceO2::InfoLogger::InfoLogger::endm;

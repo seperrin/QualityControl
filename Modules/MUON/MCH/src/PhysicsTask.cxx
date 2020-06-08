@@ -73,7 +73,7 @@ void PhysicsTask::initialize(o2::framework::InitContext& /*ctx*/)
 
   mDecoder.initialize();
 
-  mPrintLevel = 1;
+  mPrintLevel = 0;
 
   flog = stdout; //fopen("/root/qc.log", "w");
   fprintf(stdout, "PhysicsTask initialization finished\n");
@@ -406,8 +406,10 @@ void PhysicsTask::monitorData(o2::framework::ProcessingContext& ctx)
   count += 1;
 #endif
 
-  QcInfoLogger::GetInstance() << "monitorData" << AliceO2::InfoLogger::InfoLogger::endm;
-  fprintf(flog, "\n================\nmonitorData\n================\n");
+  if (mPrintLevel >= 1) {
+    QcInfoLogger::GetInstance() << "monitorData" << AliceO2::InfoLogger::InfoLogger::endm;
+    fprintf(flog, "\n================\nmonitorData\n================\n");
+  }
   monitorDataReadout(ctx);
   bool preclustersFound = false;
   bool preclusterDigitsFound = false;
