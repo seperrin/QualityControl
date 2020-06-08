@@ -69,13 +69,13 @@ class PhysicsTaskDigits /*final*/ : public TaskInterface // todo add back the "f
   TH1F* mHistogramADCamplitude[72];
   std::vector<int> DEs;
   std::map<int, TH1F*> mHistogramADCamplitudeDE;
-  std::map<int, TH2F*> mHistogramNhitsDE;
-  std::map<int, TH2F*> mHistogramNhitsHighAmplDE;
+  std::map<int, TH2F*> mHistogramNhitsDE[4]; // 1 B, 1 NB, 2 B+NB
+  std::map<int, TH2F*> mHistogramNhitsHighAmplDE[2]; // 1 B, 1 NB
     
-  std::map<int, TH2F*> mHistogramOccupancyXY[3];
+  std::map<int, TH2F*> mHistogramOccupancyXY[3]; //Inutile
   TRandom3 rnd;
 
-  GlobalHistogram* mHistogramOccupancy[1];
+  GlobalHistogram* mHistogramOccupancy[3]; // 1 B, 1 NB, 1 B+NB
 
   int mPrintLevel;
 };

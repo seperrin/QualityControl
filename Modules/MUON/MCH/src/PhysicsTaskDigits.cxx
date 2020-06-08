@@ -120,15 +120,36 @@ void PhysicsTaskDigits::initialize(o2::framework::InitContext& /*ctx*/)
           float Xsize2 = Xsize / 2;
           float Ysize = 50;
           float Ysize2 = Ysize / 2;
-
+            
           TH2F* h2 = new TH2F(TString::Format("QcMuonChambers_Nhits_DE%03d", de),
               TString::Format("QcMuonChambers - Number of hits (DE%03d)", de), Xsize * 2, -Xsize2, Xsize2, Ysize * 2, -Ysize2, Ysize2);
-          mHistogramNhitsDE.insert(make_pair(de, h2));
+          mHistogramNhitsDE[0].insert(make_pair(de, h2));
           getObjectsManager()->startPublishing(h2);
-          h2 = new TH2F(TString::Format("QcMuonChambers_Nhits_HighAmpl_DE%03d", de),
-              TString::Format("QcMuonChambers - Number of hits for Csum>500 (DE%03d)", de), Xsize * 2, -Xsize2, Xsize2, Ysize * 2, -Ysize2, Ysize2);
-          mHistogramNhitsHighAmplDE.insert(make_pair(de, h2));
+
+          h2 = new TH2F(TString::Format("QcMuonChambers_Nhits_DE%03d_B", de),
+              TString::Format("QcMuonChambers - Number of hits (DE%03d B)", de), Xsize * 2, -Xsize2, Xsize2, Ysize * 2, -Ysize2, Ysize2);
+          mHistogramNhitsDE[1].insert(make_pair(de, h2));
+          getObjectsManager()->startPublishing(h2);
+            
+          h2 = new TH2F(TString::Format("QcMuonChambers_Nhits_DE%03d_NB", de),
+              TString::Format("QcMuonChambers - Number of hits (DE%03d NB)", de), Xsize * 2, -Xsize2, Xsize2, Ysize * 2, -Ysize2, Ysize2);
+          mHistogramNhitsDE[2].insert(make_pair(de, h2));
+          getObjectsManager()->startPublishing(h2);
+            
+          h2 = new TH2F(TString::Format("QcMuonChambers_Nhits_DE%03d_BNB", de),
+              TString::Format("QcMuonChambers - Number of hits (DE%03d BNB)", de), Xsize * 2, -Xsize2, Xsize2, Ysize * 2, -Ysize2, Ysize2);
+          mHistogramNhitsDE[3].insert(make_pair(de, h2));
+          getObjectsManager()->startPublishing(h2);
+            
+          h2 = new TH2F(TString::Format("QcMuonChambers_Nhits_HighAmpl_DE%03d_B", de),
+              TString::Format("QcMuonChambers - Number of hits for Csum>500 (DE%03d B)", de), Xsize * 2, -Xsize2, Xsize2, Ysize * 2, -Ysize2, Ysize2);
+          mHistogramNhitsHighAmplDE[0].insert(make_pair(de, h2));
           //getObjectsManager()->startPublishing(h2);
+            
+            h2 = new TH2F(TString::Format("QcMuonChambers_Nhits_HighAmpl_DE%03d_NB", de),
+                TString::Format("QcMuonChambers - Number of hits for Csum>500 (DE%03d NB)", de), Xsize * 2, -Xsize2, Xsize2, Ysize * 2, -Ysize2, Ysize2);
+            mHistogramNhitsHighAmplDE[1].insert(make_pair(de, h2));
+            //getObjectsManager()->startPublishing(h2);
         }
       }
     }
@@ -148,9 +169,9 @@ void PhysicsTaskDigits::initialize(o2::framework::InitContext& /*ctx*/)
           TString::Format("QcMuonChambers - Occupancy XY (DE%03d B)", de), Xsize / scale, -Xsize2, Xsize2, Ysize / scale, -Ysize2, Ysize2);
       mHistogramOccupancyXY[0].insert(make_pair(de, hXY));
 
-//      hXY = new TH2F(TString::Format("QcMuonChambers_Occupancy_NB_XY_%03d", de),
-//           TString::Format("QcMuonChambers - Occupancy XY (DE%03d NB)", de), Xsize / scale, -Xsize2, Xsize2, Ysize / scale, -Ysize2, Ysize2);
-//      mHistogramOccupancyXY[1].insert(make_pair(de, hXY));
+      hXY = new TH2F(TString::Format("QcMuonChambers_Occupancy_NB_XY_%03d", de),
+           TString::Format("QcMuonChambers - Occupancy XY (DE%03d NB)", de), Xsize / scale, -Xsize2, Xsize2, Ysize / scale, -Ysize2, Ysize2);
+      mHistogramOccupancyXY[1].insert(make_pair(de, hXY));
 //
 //      hXY = new TH2F(TString::Format("QcMuonChambers_Occupancy_BNB_XY_%03d", de),
 //           TString::Format("QcMuonChambers - Occupancy XY (DE%03d B+NB)", de), Xsize / scale, -Xsize2, Xsize2, Ysize / scale, -Ysize2, Ysize2);
@@ -158,12 +179,12 @@ void PhysicsTaskDigits::initialize(o2::framework::InitContext& /*ctx*/)
     }
   }
     
-  mHistogramOccupancy[0] = new GlobalHistogram("QcMuonChambers_Occupancy_den", "Occupancy");
+  mHistogramOccupancy[0] = new GlobalHistogram("QcMuonChambers_Occupancy_denB", "Occupancy B");
   mHistogramOccupancy[0]->init();
-//  mHistogramOccupancy[1] = new GlobalHistogram("QcMuonChambers_Occupancy", "Occupancy");
-//  mHistogramOccupancy[1]->init();
-//  mHistogramOccupancy[2] = new GlobalHistogram("QcMuonChambers_Occupancy_BNB", "Occupancy - B+NB");
-//  mHistogramOccupancy[2]->init();
+  mHistogramOccupancy[1] = new GlobalHistogram("QcMuonChambers_Occupancy_NB", "Occupancy NB");
+  mHistogramOccupancy[1]->init();
+  mHistogramOccupancy[2] = new GlobalHistogram("QcMuonChambers_Occupancy_BNB", "Occupancy - B+NB");
+  mHistogramOccupancy[2]->init();
 }
 
 void PhysicsTaskDigits::startOfActivity(Activity& /*activity*/)
@@ -298,18 +319,24 @@ void PhysicsTaskDigits::monitorData(o2::framework::ProcessingContext& ctx)
           h->second->Write();
         }
       }
-      {
-        auto h = mHistogramNhitsDE.find(de);
-        if ((h != mHistogramNhitsDE.end()) && (h->second != NULL)) {
-          h->second->Write();
+        
+      for(int i=0; i<4; i++){
+        {
+          auto h = mHistogramNhitsDE[i].find(de);
+          if ((h != mHistogramNhitsDE[i].end()) && (h->second != NULL)) {
+            h->second->Write();
+          }
         }
       }
-      {
-        auto h = mHistogramNhitsHighAmplDE.find(de);
-        if ((h != mHistogramNhitsHighAmplDE.end()) && (h->second != NULL)) {
-          h->second->Write();
+        
+        for(int i=0; i<2; i++){
+          {
+            auto h = mHistogramNhitsHighAmplDE[i].find(de);
+            if ((h != mHistogramNhitsHighAmplDE[i].end()) && (h->second != NULL)) {
+              h->second->Write();
+            }
+          }
         }
-      }
     }
 
     f.ls();
@@ -366,15 +393,32 @@ void PhysicsTaskDigits::plotDigit(const o2::mch::Digit& digit)
     //if(pad.fX>=32 && pad.fX<=34 && pad.fY>=1.1 && pad.fY<=1.4)
     //  fprintf(flog, "mapping: link_id=%d ds_addr=%d chan_addr=%d  ==>  de=%d x=%f y=%f A=%d\n",
     //    hit.link_id, hit.ds_addr, hit.chan_addr, pad.fDE, pad.fX, pad.fY, hit.csum);
-
+      
     auto h = mHistogramADCamplitudeDE.find(de);
     if ((h != mHistogramADCamplitudeDE.end()) && (h->second != NULL)) {
       h->second->Fill(ADC);
     }
-
+      
+    if (ADC > 0) {
+      auto h2 = mHistogramNhitsDE[0].find(de);
+      if ((h2 != mHistogramNhitsDE[0].end()) && (h2->second != NULL)) {
+        int binx_min = h2->second->GetXaxis()->FindBin(padX - padSizeX / 2 + 0.1);
+        int binx_max = h2->second->GetXaxis()->FindBin(padX + padSizeX / 2 - 0.1);
+        int biny_min = h2->second->GetYaxis()->FindBin(padY - padSizeY / 2 + 0.1);
+        int biny_max = h2->second->GetYaxis()->FindBin(padY + padSizeY / 2 - 0.1);
+        for (int by = biny_min; by <= biny_max; by++) {
+          float y = h2->second->GetYaxis()->GetBinCenter(by);
+          for (int bx = binx_min; bx <= binx_max; bx++) {
+            float x = h2->second->GetXaxis()->GetBinCenter(bx);
+            h2->second->Fill(x, y);
+          }
+        }
+      }
+    }
+      
     if (cathode == 0 && ADC > 0) {
-      auto h2 = mHistogramNhitsDE.find(de);
-      if ((h2 != mHistogramNhitsDE.end()) && (h2->second != NULL)) {
+      auto h2 = mHistogramNhitsDE[1].find(de);
+      if ((h2 != mHistogramNhitsDE[1].end()) && (h2->second != NULL)) {
         int binx_min = h2->second->GetXaxis()->FindBin(padX - padSizeX / 2 + 0.1);
         int binx_max = h2->second->GetXaxis()->FindBin(padX + padSizeX / 2 - 0.1);
         int biny_min = h2->second->GetYaxis()->FindBin(padY - padSizeY / 2 + 0.1);
@@ -388,9 +432,45 @@ void PhysicsTaskDigits::plotDigit(const o2::mch::Digit& digit)
         }
       }
     }
+    
+    if (cathode == 1 && ADC > 0) {
+      auto h2 = mHistogramNhitsDE[2].find(de);
+      if ((h2 != mHistogramNhitsDE[2].end()) && (h2->second != NULL)) {
+        int binx_min = h2->second->GetXaxis()->FindBin(padX - padSizeX / 2 + 0.1);
+        int binx_max = h2->second->GetXaxis()->FindBin(padX + padSizeX / 2 - 0.1);
+        int biny_min = h2->second->GetYaxis()->FindBin(padY - padSizeY / 2 + 0.1);
+        int biny_max = h2->second->GetYaxis()->FindBin(padY + padSizeY / 2 - 0.1);
+        for (int by = biny_min; by <= biny_max; by++) {
+          float y = h2->second->GetYaxis()->GetBinCenter(by);
+          for (int bx = binx_min; bx <= binx_max; bx++) {
+            float x = h2->second->GetXaxis()->GetBinCenter(bx);
+            h2->second->Fill(x, y);
+          }
+        }
+      }
+    }
+      
+    if ((cathode == 0 || cathode == 1) && ADC > 0) {
+      auto h2 = mHistogramNhitsDE[3].find(de);
+      if ((h2 != mHistogramNhitsDE[3].end()) && (h2->second != NULL)) {
+        int binx_min = h2->second->GetXaxis()->FindBin(padX - padSizeX / 2 + 0.1);
+        int binx_max = h2->second->GetXaxis()->FindBin(padX + padSizeX / 2 - 0.1);
+        int biny_min = h2->second->GetYaxis()->FindBin(padY - padSizeY / 2 + 0.1);
+        int biny_max = h2->second->GetYaxis()->FindBin(padY + padSizeY / 2 - 0.1);
+        for (int by = biny_min; by <= biny_max; by++) {
+          float y = h2->second->GetYaxis()->GetBinCenter(by);
+          for (int bx = binx_min; bx <= binx_max; bx++) {
+            float x = h2->second->GetXaxis()->GetBinCenter(bx);
+            h2->second->Fill(x, y);
+          }
+        }
+      }
+    }
+
+      
     if (cathode == 0 && ADC > 500) {
-      auto h2 = mHistogramNhitsHighAmplDE.find(de);
-      if ((h2 != mHistogramNhitsHighAmplDE.end()) && (h2->second != NULL)) {
+      auto h2 = mHistogramNhitsHighAmplDE[0].find(de);
+      if ((h2 != mHistogramNhitsHighAmplDE[0].end()) && (h2->second != NULL)) {
         int binx_min = h2->second->GetXaxis()->FindBin(padX - padSizeX / 2 + 0.1);
         int binx_max = h2->second->GetXaxis()->FindBin(padX + padSizeX / 2 - 0.1);
         int biny_min = h2->second->GetYaxis()->FindBin(padY - padSizeY / 2 + 0.1);
@@ -404,6 +484,24 @@ void PhysicsTaskDigits::plotDigit(const o2::mch::Digit& digit)
         }
       }
     }
+      
+    if (cathode == 1 && ADC > 500) {
+         auto h2 = mHistogramNhitsHighAmplDE[1].find(de);
+         if ((h2 != mHistogramNhitsHighAmplDE[1].end()) && (h2->second != NULL)) {
+           int binx_min = h2->second->GetXaxis()->FindBin(padX - padSizeX / 2 + 0.1);
+           int binx_max = h2->second->GetXaxis()->FindBin(padX + padSizeX / 2 - 0.1);
+           int biny_min = h2->second->GetYaxis()->FindBin(padY - padSizeY / 2 + 0.1);
+           int biny_max = h2->second->GetYaxis()->FindBin(padY + padSizeY / 2 - 0.1);
+           for (int by = biny_min; by <= biny_max; by++) {
+             float y = h2->second->GetYaxis()->GetBinCenter(by);
+             for (int bx = binx_min; bx <= binx_max; bx++) {
+               float x = h2->second->GetXaxis()->GetBinCenter(bx);
+               h2->second->Fill(x, y);
+             }
+           }
+         }
+       }
+      
   } catch (const std::exception& e) {
     QcInfoLogger::GetInstance() << "[MCH] Detection Element " << de << " not found in mapping." << AliceO2::InfoLogger::InfoLogger::endm;
     return;
@@ -416,7 +514,7 @@ void PhysicsTaskDigits::endOfCycle()
   QcInfoLogger::GetInstance() << "endOfCycle" << AliceO2::InfoLogger::InfoLogger::endm;
 
   for(int de = 100; de <= 1030; de++) {
-    for(int i = 0; i < 1; i++) {
+    for(int i = 0; i < 2; i++) {
         auto ih = mHistogramOccupancyXY[i+1].find(de);
         ih = mHistogramOccupancyXY[i].find(de);
         if (ih == mHistogramOccupancyXY[i].end()) {
@@ -425,9 +523,9 @@ void PhysicsTaskDigits::endOfCycle()
     }
   }
 
-    mHistogramOccupancy[0]->add(mHistogramNhitsDE, mHistogramNhitsDE);
-//    mHistogramOccupancy[1]->add(mHistogramPreclustersXY[1], mHistogramPreclustersXY[2]);
-//    mHistogramOccupancy[2]->add(mHistogramPreclustersXY[3], mHistogramPreclustersXY[3]);
+    mHistogramOccupancy[0]->add(mHistogramNhitsDE[1], mHistogramNhitsDE[1]);
+    mHistogramOccupancy[1]->add(mHistogramNhitsDE[2], mHistogramNhitsDE[2]);
+    mHistogramOccupancy[2]->add(mHistogramNhitsDE[3], mHistogramNhitsDE[3]);
 
 #ifdef QC_MCH_SAVE_TEMP_ROOTFILE
     TFile f("/tmp/qc.root", "RECREATE");
@@ -446,23 +544,29 @@ void PhysicsTaskDigits::endOfCycle()
           h->second->Write();
         }
       }
-      {
-        auto h = mHistogramNhitsDE.find(de);
-        if ((h != mHistogramNhitsDE.end()) && (h->second != NULL)) {
-          h->second->Write();
+      
+        for(int i=0; i<4;i++){
+          {
+            auto h = mHistogramNhitsDE[i].find(de);
+            if ((h != mHistogramNhitsDE[i].end()) && (h->second != NULL)) {
+              h->second->Write();
+            }
+          }
         }
-      }
-      {
-        auto h = mHistogramNhitsHighAmplDE.find(de);
-        if ((h != mHistogramNhitsHighAmplDE.end()) && (h->second != NULL)) {
-          h->second->Write();
+        
+        for(int i=0; i<2;i++){
+          {
+            auto h = mHistogramNhitsHighAmplDE[i].find(de);
+            if ((h != mHistogramNhitsHighAmplDE[i].end()) && (h->second != NULL)) {
+              h->second->Write();
+            }
+          }
         }
-      }
     }
     
     mHistogramOccupancy[0]->Write();
-//    mHistogramOccupancy[1]->Write();
-//    mHistogramOccupancy[2]->Write();
+    mHistogramOccupancy[1]->Write();
+    mHistogramOccupancy[2]->Write();
 
     //f.ls();
     f.Close();
