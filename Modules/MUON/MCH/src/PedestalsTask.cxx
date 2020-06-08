@@ -351,10 +351,10 @@ void PedestalsTask::monitorDataReadout(o2::framework::ProcessingContext& ctx)
   for (auto it = parser.begin(), end = parser.end(); it != end; ++it) {
     // retrieving RDH v4
     //auto const* rdh = it.get_if<o2::header::RDHAny>();
-    //auto const* rdh4 = it.get_if<o2::header::RAWDataHeaderV4>();
+    auto const* rdh4 = it.get_if<o2::header::RAWDataHeaderV4>();
     auto const* rdh6 = it.get_if<o2::header::RAWDataHeaderV6>();
-    //if (!rdh4 && !rdh6)
-    //  continue;
+    if (!rdh4 && !rdh6)
+      continue;
     // retrieving the raw pointer of the page
     auto const* raw = it.raw();
     // size of payload
