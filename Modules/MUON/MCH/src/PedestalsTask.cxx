@@ -107,9 +107,12 @@ void PedestalsTask::initialize(o2::framework::InitContext& /*ctx*/)
     }
 
     mDecoder.initialize();
+      
+       QcInfoLogger::GetInstance() << "Back to PedestalsTaskInit" << AliceO2::InfoLogger::InfoLogger::endm;
 
     mHistogramPedestals = new TH2F("QcMuonChambers_Pedestals", "QcMuonChambers - Pedestals",
         (MCH_FFEID_MAX+1)*12*40, 0, (MCH_FFEID_MAX+1)*12*40, 64, 0, 64);
+      QcInfoLogger::GetInstance() << "Pouet 0" << AliceO2::InfoLogger::InfoLogger::endm;
     //getObjectsManager()->startPublishing(mHistogramPedestals);
     mHistogramPedestalsMCH = new GlobalHistogram("QcMuonChambers_Pedestals_AllDE", "Pedestals");
     mHistogramPedestalsMCH->init();
@@ -119,6 +122,8 @@ void PedestalsTask::initialize(o2::framework::InitContext& /*ctx*/)
     //getObjectsManager()->startPublishing(mHistogramNoise);
     mHistogramNoiseMCH = new GlobalHistogram("QcMuonChambers_Noise_AllDE", "Noise");
     mHistogramNoiseMCH->init();
+      
+      QcInfoLogger::GetInstance() << "Pouet 1" << AliceO2::InfoLogger::InfoLogger::endm;
 
     uint32_t dsid;
     std::vector<int> DEs;
@@ -137,6 +142,8 @@ void PedestalsTask::initialize(o2::framework::InitContext& /*ctx*/)
           if (ret < 0)
             continue;
 
+            QcInfoLogger::GetInstance() << "Pouet 2" << AliceO2::InfoLogger::InfoLogger::endm;
+            
           if ((std::find(DEs.begin(), DEs.end(), de)) == DEs.end()) {
             DEs.push_back(de);
             TH2F* hPedDE = new TH2F(TString::Format("QcMuonChambers_Pedestals_DE%03d", de),
@@ -163,6 +170,8 @@ void PedestalsTask::initialize(o2::framework::InitContext& /*ctx*/)
                   TString::Format("QcMuonChambers - Noise distribution (DE%03d NB, %d)", de, pi), 1000, 0, 10);
               mHistogramNoiseDistributionDE[pi][1].insert(make_pair(de, hNoiseDE));
             }
+              
+              QcInfoLogger::GetInstance() << "Pouet 3" << AliceO2::InfoLogger::InfoLogger::endm;
 
             float Xsize = 50 * 5;
             float Xsize2 = Xsize / 2;
@@ -195,6 +204,8 @@ void PedestalsTask::initialize(o2::framework::InitContext& /*ctx*/)
   }
 
   mPrintLevel = 0;
+    
+    QcInfoLogger::GetInstance() << "Finished PedestalsTaskInit" << AliceO2::InfoLogger::InfoLogger::endm;
 
   flog = stdout; //fopen("/root/qc.log", "w");
 }
@@ -242,6 +253,11 @@ void PedestalsTask::fill_noise_distributions()
         float padSizeX = pad.fSizeX;
         float padSizeY = pad.fSizeY;
         int cathode = pad.fCathode;
+          
+          if (noise > 1.2){
+              //We have a noisy channel
+              std::cout << "Noisy channel identified: dsid " << dsid << ", chan_addr " << chan_addr << std::endl;
+          }
 
         /*
         o2::mch::mapping::Segmentation segment(de);
@@ -410,6 +426,10 @@ void PedestalsTask::monitorDataReadout(o2::framework::ProcessingContext& ctx)
     // Fill the histograms for each CRU link
     double rms = std::sqrt(noise[hit.cru_id][hit.link_id][hit.ds_addr][hit.chan_addr] /
         nhits[hit.cru_id][hit.link_id][hit.ds_addr][hit.chan_addr]);
+      
+      if(rms > 1.2){
+          std::cout << "Noisy channel identified (DataReadout): ds_addr " << (int)hit.ds_addr << ", chan_addr " << (int)hit.chan_addr << ", cru_id " << (int)hit.cru_id << ", link_id" << (int)hit.link_id <<std::endl;
+      }
 
     /*if( false && hit.cru_id==0 && hit.link_id==0 && hit.ds_addr==0 && hit.chan_addr==0)
       printf("%d %d %d %d -> %d %f %f\n", (int)hit.cru_id, (int)hit.link_id, (int)hit.ds_addr, (int)hit.chan_addr,
