@@ -24,6 +24,10 @@
 #include <TList.h>
 #include <TMath.h>
 #include <TPaveText.h>
+#include <iostream>
+#include <fstream>
+#include <string>
+
 
 using namespace std;
 
@@ -32,6 +36,11 @@ namespace o2::quality_control_modules::muonchambers
 
 PedestalsCheck::PedestalsCheck() : minMCHpedestal(50.f), maxMCHpedestal(100.f)
 {
+    ofstream myfile;
+    noisyfilename = "/tmp/NoisyChannelsPedestalsCheck.txt";
+    myfile.open(noisyfilename.c_str(), ios::out | ios::trunc);
+    myfile << "fee_id    link_id   ds_addr  chan_addr\n";
+    myfile.close();
 }
 
 PedestalsCheck::~PedestalsCheck() {}
@@ -46,15 +55,16 @@ void PedestalsCheck::configure(std::string)
 
 Quality PedestalsCheck::check(std::map<std::string, std::shared_ptr<MonitorObject>>* moMap)
 {
-  //std::cout<<"================================="<<std::endl;
-  //std::cout<<"PedestalsCheck::check() called"<<std::endl;
-  //std::cout<<"================================="<<std::endl;
+  std::cout<<"================================="<<std::endl;
+  std::cout<<"PedestalsCheck::check() called"<<std::endl;
+  std::cout<<"================================="<<std::endl;
   Quality result = Quality::Null;
+  ofstream myfile;
 
   for (auto& [moName, mo] : *moMap) {
 
     (void)moName;
-    if (mo->getName().find("QcMuonChambers_Pedestals") != std::string::npos) {
+    if (mo->getName().find("QcMuonChambers_PedestalsA") != std::string::npos) {
       auto* h = dynamic_cast<TH2F*>(mo->getObject());
       if (!h)
         return result;
@@ -78,6 +88,43 @@ Quality PedestalsCheck::check(std::map<std::string, std::shared_ptr<MonitorObjec
           result = Quality::Bad;
       }
     }
+      
+        if (mo->getName().find("QcMuonChambers_NoiseA") != std::string::npos) {
+            auto* h = dynamic_cast<TH2F*>(mo->getObject());
+            if (!h)
+                continue;
+            if (h->GetEntries() == 0) {
+                std::cout << "Nothing to check, Noise histogram is empty" << std::endl;
+            } else {
+              int nbinsx = h->GetXaxis()->GetNbins();
+              int nbinsy = h->GetYaxis()->GetNbins();
+              int nnoisy = 0;
+              for (int i = 1; i <= nbinsx; i++) {
+                for (int j = 1; j <= nbinsy; j++) {
+                  Float_t noise = h->GetBinContent(i, j);
+                    if (noise > 1.2){
+                    nnoisy += 1;
+                    int ds_addr =  (i%40)-1;
+                    int link_id = ( (i-1-ds_addr) / 40 ) % 12;
+                    int fee_id = (i-1-ds_addr-40*link_id) / (12*40);
+                    int chan_addr = j-1;
+                    
+                    std::cout << "Noisy channel read from Noise histogram: fee_id = "<< fee_id << ", link_id = "<< link_id << ", ds_addr = "<< ds_addr << " , chan_addr = " << chan_addr <<" with a noise of " << noise << std::endl;
+                    
+                    myfile.open(noisyfilename.c_str(), ios_base::out | ios_base::app);
+                    myfile << fee_id << "   " << link_id << "    " << ds_addr << "   " << chan_addr << "\n";
+                    myfile.close();
+                    }
+                }
+              }
+                if (nnoisy == 0){
+                    std::cout << "No noisy channel detected" << std::endl;
+                }
+              else
+                std::cout << nnoisy << " noisy channel(s) detected" << std::endl;
+            }
+        }
+      
   }
   return result;
 }
@@ -89,7 +136,7 @@ void PedestalsCheck::beautify(std::shared_ptr<MonitorObject> mo, Quality checkRe
   //std::cout<<"===================================="<<std::endl;
   //std::cout<<"PedestalsCheck::beautify() called"<<std::endl;
   //std::cout<<"===================================="<<std::endl;
-  if (mo->getName().find("QcMuonChambers_Pedestals") != std::string::npos) {
+  if (mo->getName().find("QcMuonChambers_PedestalsA") != std::string::npos) {
     auto* h = dynamic_cast<TH2F*>(mo->getObject());
     h->SetDrawOption("colz");
     TPaveText* msg = new TPaveText(0.1, 0.9, 0.9, 0.95, "NDC");
@@ -131,7 +178,7 @@ void PedestalsCheck::beautify(std::shared_ptr<MonitorObject> mo, Quality checkRe
 
   //____________________________________________________________________________
   // Noise histograms
-  if (mo->getName().find("QcMuonChambers_Noise") != std::string::npos) {
+  if (mo->getName().find("QcMuonChambers_NoiseA") != std::string::npos) {
     auto* h = dynamic_cast<TH2F*>(mo->getObject());
     if (!h)
       return;

@@ -19,6 +19,7 @@
 #include "QualityControl/CheckInterface.h"
 #include "QualityControl/MonitorObject.h"
 #include "QualityControl/Quality.h"
+#include <string>
 
 namespace o2::quality_control_modules::muonchambers
 {
@@ -48,6 +49,8 @@ class PedestalsCheck : public o2::quality_control::checker::CheckInterface
  private:
   /// Vector filled with DualSampas Ids that have been tested but sent back no data
   std::vector<int> missing;
+    
+    std::string noisyfilename;
 
   ClassDefOverride(PedestalsCheck, 1);
 };

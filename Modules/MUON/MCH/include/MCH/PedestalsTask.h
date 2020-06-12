@@ -75,6 +75,8 @@ class PedestalsTask final : public TaskInterface
 
   void fill_noise_distributions();
   void save_histograms();
+    
+    std::string noisyfilename;
 };
 
 } // namespace o2
