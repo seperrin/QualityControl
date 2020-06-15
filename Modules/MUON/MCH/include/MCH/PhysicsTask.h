@@ -45,7 +45,7 @@ class PhysicsTask /*final*/ : public TaskInterface // todo add back the "final" 
   void startOfActivity(Activity& activity) override;
   void startOfCycle() override;
   void monitorDataReadout(o2::framework::ProcessingContext& ctx);
-  void monitorDataDigits(const o2::framework::DataRef& input);
+  void monitorDataDigits(o2::framework::ProcessingContext& ctx);
   void monitorDataPreclusters(o2::framework::ProcessingContext& ctx);
   void monitorData(o2::framework::ProcessingContext& ctx) override;
   void endOfCycle() override;
