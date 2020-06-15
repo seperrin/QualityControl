@@ -275,38 +275,19 @@ void PhysicsTask::monitorDataReadout(o2::framework::ProcessingContext& ctx)
 }
 
 
-void PhysicsTask::monitorDataDigits(const o2::framework::DataRef& input)
+void PhysicsTask::monitorDataDigits(o2::framework::ProcessingContext& ctx)
 {
-  if (input.spec->binding != "digits")
-    return;
+    fprintf(flog, "\n================\monitorDataDigits\n================\n");
+  // get the input preclusters and associated digits
+  auto digits = ctx.inputs().get<gsl::span<o2::mch::Digit>>("digits");
+  auto orbits = ctx.inputs().get<gsl::span<uint64_t>>("orbits");
 
-  const auto* header = o2::header::get<header::DataHeader*>(input.header);
-  if (mPrintLevel >= 1)
-    fprintf(flog, "Header: %p\n", (void*)header);
-  if (!header)
-    return;
-  //QcInfoLogger::GetInstance() << "payloadSize: " << header->payloadSize << AliceO2::InfoLogger::InfoLogger::endm;
-  if (mPrintLevel >= 1)
-    fprintf(flog, "payloadSize: %d\n", (int)header->payloadSize);
-  if (mPrintLevel >= 1)
-    fprintf(flog, "payload: %p\n", input.payload);
-
-  std::vector<o2::mch::Digit> digits{ 0 };
-  o2::mch::Digit* digitsBuffer = NULL;
-  digitsBuffer = (o2::mch::Digit*)input.payload;
-  size_t ndigits = ((size_t)header->payloadSize / sizeof(o2::mch::Digit));
-
-  if (mPrintLevel >= 1)
-    std::cout << "There are " << ndigits << " digits in the payload" << std::endl;
-
-  o2::mch::Digit* ptr = (o2::mch::Digit*)digitsBuffer;
-  for (size_t di = 0; di < ndigits; di++) {
-    digits.push_back(*ptr);
-    ptr += 1;
+  if (mPrintLevel >= 1) {
+  std::cout<<"digits.size()="<<digits.size()<<std::endl;
   }
 
   for (auto& d : digits) {
-    if (mPrintLevel >= 1) {
+    if (mPrintLevel >= 0) {
       std::cout << fmt::format("  DE {:4d}  PAD {:5d}  ADC {:6d}  TIME ({} {} {:4d})",
           d.getDetID(), d.getPadID(), d.getADC(), d.getTime().orbit, d.getTime().bunchCrossing, d.getTime().sampaTime);
       std::cout << std::endl;
@@ -314,7 +295,6 @@ void PhysicsTask::monitorDataDigits(const o2::framework::DataRef& input)
     plotDigit(d);
   }
 }
-
 
 void PhysicsTask::monitorDataPreclusters(o2::framework::ProcessingContext& ctx)
 {
@@ -406,11 +386,12 @@ void PhysicsTask::monitorData(o2::framework::ProcessingContext& ctx)
   count += 1;
 #endif
 
-  if (mPrintLevel >= 1) {
-    QcInfoLogger::GetInstance() << "monitorData" << AliceO2::InfoLogger::InfoLogger::endm;
-    fprintf(flog, "\n================\nmonitorData\n================\n");
+  if (mPrintLevel >= 0) {
+    QcInfoLogger::GetInstance() << "PhysicsTask::monitorData" << AliceO2::InfoLogger::InfoLogger::endm;
+    fprintf(flog, "\n================\nPhysicsTask::monitorData\n================\n");
   }
-  monitorDataReadout(ctx);
+  //monitorDataReadout(ctx);
+  bool digitsFound = false;
   bool preclustersFound = false;
   bool preclusterDigitsFound = false;
   for (auto&& input : ctx.inputs()) {
@@ -418,7 +399,7 @@ void PhysicsTask::monitorData(o2::framework::ProcessingContext& ctx)
       QcInfoLogger::GetInstance() << "run PhysicsTask: input " << input.spec->binding << AliceO2::InfoLogger::InfoLogger::endm;
     }
     if (input.spec->binding == "digits") {
-      monitorDataDigits(input);
+      digitsFound = true;
     }
     if (input.spec->binding == "preclusters") {
       preclustersFound = true;
@@ -428,6 +409,9 @@ void PhysicsTask::monitorData(o2::framework::ProcessingContext& ctx)
     }
   }
 //  monitorDataReadout(ctx);
+  if (digitsFound) {
+    monitorDataDigits(ctx);
+  }
   if(preclustersFound && preclusterDigitsFound) {
     monitorDataPreclusters(ctx);
   }
