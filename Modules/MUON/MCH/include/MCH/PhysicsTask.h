@@ -9,6 +9,7 @@
 #define QC_MODULE_MUONCHAMBERS_PHYSICSTASK_H
 
 #include <TRandom3.h>
+#include <vector>
 
 #include "QualityControl/TaskInterface.h"
 #include "MCH/Mapping.h"
@@ -64,6 +65,8 @@ class PhysicsTask /*final*/ : public TaskInterface // todo add back the "final" 
   int count;
   Decoder mDecoder;
   uint64_t nhits[24][40][64];
+  uint32_t norbits[1030];
+  uint32_t firstorbitseen[1030];
 
   std::vector<std::unique_ptr<mch::Digit>> digits;
   mch::Digit* digitsBuffer;
@@ -74,6 +77,7 @@ class PhysicsTask /*final*/ : public TaskInterface // todo add back the "final" 
   std::vector<int> DEs;
   std::map<int, TH1F*> mHistogramADCamplitudeDE;
   std::map<int, TH2F*> mHistogramNhitsDE;
+  std::map<int, TH2F*> mHistogramNorbitsDE;
   std::map<int, TH2F*> mHistogramNhitsHighAmplDE;
 
   std::map<int, TH1F*> mHistogramClchgDE;
@@ -86,6 +90,7 @@ class PhysicsTask /*final*/ : public TaskInterface // todo add back the "final" 
 
   GlobalHistogram* mHistogramPseudoeff[3];
   GlobalHistogram* mHistogramOccupancy[1];
+  GlobalHistogram* mHistogramOrbits[1];
 
   int mPrintLevel;
 };

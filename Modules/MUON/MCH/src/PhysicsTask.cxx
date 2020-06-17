@@ -10,6 +10,7 @@
 #include <TH2.h>
 #include <TFile.h>
 #include <algorithm>
+#include <iterator>
 
 #include "Headers/RAWDataHeader.h"
 #include "DPLUtils/DPLRawParser.h"
@@ -73,7 +74,7 @@ void PhysicsTask::initialize(o2::framework::InitContext& /*ctx*/)
 
   mDecoder.initialize();
 
-  mPrintLevel = 0;
+  mPrintLevel = 2;
 
   flog = stdout; //fopen("/root/qc.log", "w");
   fprintf(stdout, "PhysicsTask initialization finished\n");
@@ -128,6 +129,9 @@ void PhysicsTask::initialize(o2::framework::InitContext& /*ctx*/)
           h2 = new TH2F(TString::Format("QcMuonChambers_Nhits_HighAmpl_DE%03d", de),
               TString::Format("QcMuonChambers - Number of hits for Csum>500 (DE%03d)", de), Xsize * 2, -Xsize2, Xsize2, Ysize * 2, -Ysize2, Ysize2);
           mHistogramNhitsHighAmplDE.insert(make_pair(de, h2));
+          h2 = new TH2F(TString::Format("QcMuonChambers_Norbits_DE%03d", de),
+              TString::Format("QcMuonChambers - Number of orbits (DE%03d)", de), Xsize * 2, -Xsize2, Xsize2, Ysize * 2, -Ysize2, Ysize2);
+          mHistogramNorbitsDE.insert(make_pair(de, h2));
           //getObjectsManager()->startPublishing(h2);
         }
       }
@@ -135,6 +139,8 @@ void PhysicsTask::initialize(o2::framework::InitContext& /*ctx*/)
   }
 
   for(int de = 1; de <= 1030; de++) {
+      norbits[de] = 0;
+      firstorbitseen[de] = 0;
     const o2::mch::mapping::Segmentation* segment = &(o2::mch::mapping::segmentation(de));
     if (segment == nullptr) continue;
 
@@ -203,6 +209,9 @@ void PhysicsTask::initialize(o2::framework::InitContext& /*ctx*/)
 //  mHistogramOccupancy[1]->init();
 //  mHistogramOccupancy[2] = new GlobalHistogram("QcMuonChambers_Occupancy_BNB", "Occupancy - B+NB");
 //  mHistogramOccupancy[2]->init();
+    
+    mHistogramOrbits[0] = new GlobalHistogram("QcMuonChambers_Orbits_den", "Orbits");
+    mHistogramOrbits[0]->init();
 }
 
 void PhysicsTask::startOfActivity(Activity& /*activity*/)
@@ -277,7 +286,7 @@ void PhysicsTask::monitorDataReadout(o2::framework::ProcessingContext& ctx)
 
 void PhysicsTask::monitorDataDigits(o2::framework::ProcessingContext& ctx)
 {
-    fprintf(flog, "\n================\monitorDataDigits\n================\n");
+    fprintf(flog, "\n================\nmonitorDataDigits\n================\n");
   // get the input preclusters and associated digits
   auto digits = ctx.inputs().get<gsl::span<o2::mch::Digit>>("digits");
   auto orbits = ctx.inputs().get<gsl::span<uint64_t>>("orbits");
@@ -285,15 +294,32 @@ void PhysicsTask::monitorDataDigits(o2::framework::ProcessingContext& ctx)
   if (mPrintLevel >= 1) {
   std::cout<<"digits.size()="<<digits.size()<<std::endl;
   }
-
-  for (auto& d : digits) {
-    if (mPrintLevel >= 0) {
-      std::cout << fmt::format("  DE {:4d}  PAD {:5d}  ADC {:6d}  TIME ({} {} {:4d})",
-          d.getDetID(), d.getPadID(), d.getADC(), d.getTime().orbit, d.getTime().bunchCrossing, d.getTime().sampaTime);
-      std::cout << std::endl;
-    }
-    plotDigit(d);
-  }
+    
+    for (auto& orb : orbits){ //Normalement une seule fois
+        
+        if (mPrintLevel >= 0) {
+            std::cout << fmt::format(" ORBIT {}", orb);
+        }
+        
+        for (auto& d : digits) {
+            
+            if(firstorbitseen[d.getDetID()] == 0){
+                firstorbitseen[d.getDetID()] = orb;
+                std::cout<< "First orbit of DE " << d.getDetID() << " is set to " << orb <<std::endl;
+            }
+            norbits[d.getDetID()] = (orb-firstorbitseen[d.getDetID()]+1);
+            std::cout<< "Number of orbits of DE " << d.getDetID() << " is set to " << norbits[d.getDetID()] <<std::endl;
+            
+            if (mPrintLevel >= 0) {
+              std::cout << fmt::format("  DE {:4d}  PAD {:5d}  ADC {:6d}  TIME ({} {} {:4d})",
+                  d.getDetID(), d.getPadID(), d.getADC(), d.getTime().orbit, d.getTime().bunchCrossing, d.getTime().sampaTime);
+              std::cout << std::endl;
+            }
+            
+            plotDigit(d);
+        }
+   }
+    
 }
 
 void PhysicsTask::monitorDataPreclusters(o2::framework::ProcessingContext& ctx)
@@ -328,64 +354,6 @@ void PhysicsTask::monitorDataPreclusters(o2::framework::ProcessingContext& ctx)
 
 void PhysicsTask::monitorData(o2::framework::ProcessingContext& ctx)
 {
-#ifdef QC_MCH_SAVE_TEMP_ROOTFILE_
-  if ((count % 100) == 0) {
-
-    TFile f("/tmp/qc.root", "RECREATE");
-    for (int i = 0; i < 3 * 24; i++) {
-      //mHistogramNhits[i]->Write();
-      //mHistogramADCamplitude[i]->Write();
-    }
-    //std::cout<<"mHistogramADCamplitudeDE.size() = "<<mHistogramADCamplitudeDE.size()<<"  DEs.size()="<<DEs.size()<<std::endl;
-    int nbDEs = DEs.size();
-    for (int elem = 0; elem < nbDEs; elem++) {
-      int de = DEs[elem];
-      //std::cout<<"  de="<<de<<std::endl;
-      {
-        auto h = mHistogramADCamplitudeDE.find(de);
-        if ((h != mHistogramADCamplitudeDE.end()) && (h->second != NULL)) {
-          h->second->Write();
-        }
-      }
-      {
-        auto h = mHistogramNhitsDE.find(de);
-        if ((h != mHistogramNhitsDE.end()) && (h->second != NULL)) {
-          h->second->Write();
-        }
-      }
-      {
-        auto h = mHistogramNhitsHighAmplDE.find(de);
-        if ((h != mHistogramNhitsHighAmplDE.end()) && (h->second != NULL)) {
-          h->second->Write();
-        }
-      }
-    }
-    {
-      for(int i = 0; i < 4; i++) {
-        for(auto& h2 : mHistogramPreclustersXY[i]) {
-          if (h2.second != nullptr) {
-            h2.second->Write();
-          }
-        }
-        //auto h2 = mHistogramPreclustersXY[i].find(de);
-        //if ((h2 != mHistogramNhitsDE.end()) && (h2->second != NULL)) {
-        //  h2->second->Write();
-        //}
-      }
-    }
-
-    f.ls();
-    f.Close();
-    if (mPrintLevel == 0) {
-      printf("count: %d\n", count);
-    }
-  }
-  if (mPrintLevel >= 1) {
-    printf("count: %d\n", count);
-  }
-  count += 1;
-#endif
-
   if (mPrintLevel >= 0) {
     QcInfoLogger::GetInstance() << "PhysicsTask::monitorData" << AliceO2::InfoLogger::InfoLogger::endm;
     fprintf(flog, "\n================\nPhysicsTask::monitorData\n================\n");
@@ -467,6 +435,20 @@ void PhysicsTask::plotDigit(const o2::mch::Digit& digit)
         }
       }
     }
+      if (cathode == 0 && ADC > 0) {
+          auto h2 = mHistogramNorbitsDE.find(de);
+           if ((h2 != mHistogramNorbitsDE.end()) && (h2->second != NULL)) {
+             int NYbins = h2->second->GetYaxis()->GetNbins();
+             int NXbins = h2->second->GetXaxis()->GetNbins();
+             for (int by = 0; by <= NYbins; by++) {
+               //float y = h2->second->GetYaxis()->GetBinCenter(by);
+               for (int bx = 0; bx <= NXbins; bx++) {
+                 //float x = h2->second->GetXaxis()->GetBinCenter(bx);
+                 h2->second->SetBinContent(bx, by, norbits[de]);
+               }
+             }
+           }
+         }
     if (cathode == 0 && ADC > 500) {
       auto h2 = mHistogramNhitsHighAmplDE.find(de);
       if ((h2 != mHistogramNhitsHighAmplDE.end()) && (h2->second != NULL)) {
@@ -833,7 +815,9 @@ void PhysicsTask::endOfCycle()
   mHistogramPseudoeff[2]->add(mHistogramPreclustersXY[3], mHistogramPreclustersXY[3]);
   mHistogramPseudoeff[2]->Divide(mHistogramPseudoeff[0]);
 
+    mHistogramOrbits[0]->add(mHistogramNorbitsDE, mHistogramNorbitsDE);
     mHistogramOccupancy[0]->add(mHistogramNhitsDE, mHistogramNhitsDE);
+    mHistogramOccupancy[0]->Divide(mHistogramOrbits[0]);
 //    mHistogramOccupancy[1]->add(mHistogramPreclustersXY[1], mHistogramPreclustersXY[2]);
 //    mHistogramOccupancy[2]->add(mHistogramPreclustersXY[3], mHistogramPreclustersXY[3]);
 
@@ -885,6 +869,7 @@ void PhysicsTask::endOfCycle()
     mHistogramPseudoeff[1]->Write();
     mHistogramPseudoeff[2]->Write();
     
+    mHistogramOrbits[0]->Write();
     mHistogramOccupancy[0]->Write();
 //    mHistogramOccupancy[1]->Write();
 //    mHistogramOccupancy[2]->Write();
