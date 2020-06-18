@@ -73,7 +73,7 @@ void PhysicsTaskDigits::initialize(o2::framework::InitContext& /*ctx*/)
 
   mDecoder.initialize();
 
-  mPrintLevel = 1;
+  mPrintLevel = 2;
 
   flog = stdout; //fopen("/root/qc.log", "w");
   fprintf(stdout, "PhysicsTaskDigits initialization finished\n");
@@ -150,12 +150,20 @@ void PhysicsTaskDigits::initialize(o2::framework::InitContext& /*ctx*/)
                 TString::Format("QcMuonChambers - Number of hits for Csum>500 (DE%03d NB)", de), Xsize * 2, -Xsize2, Xsize2, Ysize * 2, -Ysize2, Ysize2);
             mHistogramNhitsHighAmplDE[1].insert(make_pair(de, h2));
             //getObjectsManager()->startPublishing(h2);
+            h2 = new TH2F(TString::Format("QcMuonChambers_Norbits_DE%03d_B", de),
+                TString::Format("QcMuonChambers - Number of orbits (DE%03d B)", de), Xsize * 2, -Xsize2, Xsize2, Ysize * 2, -Ysize2, Ysize2);
+            mHistogramNorbitsDE[0].insert(make_pair(de, h2));
+            h2 = new TH2F(TString::Format("QcMuonChambers_Norbits_DE%03d_NB", de),
+                TString::Format("QcMuonChambers - Number of orbits (DE%03d NB)", de), Xsize * 2, -Xsize2, Xsize2, Ysize * 2, -Ysize2, Ysize2);
+            mHistogramNorbitsDE[1].insert(make_pair(de, h2));
         }
       }
     }
   }
 
   for(int de = 1; de <= 1030; de++) {
+      norbits[de] = 0;
+      firstorbitseen[de] = 0;
     const o2::mch::mapping::Segmentation* segment = &(o2::mch::mapping::segmentation(de));
     if (segment == nullptr) continue;
 
@@ -185,6 +193,11 @@ void PhysicsTaskDigits::initialize(o2::framework::InitContext& /*ctx*/)
   mHistogramOccupancy[1]->init();
   mHistogramOccupancy[2] = new GlobalHistogram("QcMuonChambers_Occupancy_BNB", "Occupancy - B+NB");
   mHistogramOccupancy[2]->init();
+    
+    mHistogramOrbits[0] = new GlobalHistogram("QcMuonChambers_Orbits_denB", "Orbits");
+    mHistogramOrbits[0]->init();
+    mHistogramOrbits[1] = new GlobalHistogram("QcMuonChambers_Orbits_NB", "Orbits");
+    mHistogramOrbits[1]->init();
 }
 
 void PhysicsTaskDigits::startOfActivity(Activity& /*activity*/)
@@ -257,109 +270,55 @@ void PhysicsTaskDigits::monitorDataReadout(o2::framework::ProcessingContext& ctx
 }
 
 
-void PhysicsTaskDigits::monitorDataDigits(const o2::framework::DataRef& input)
+void PhysicsTaskDigits::monitorDataDigits(o2::framework::ProcessingContext& ctx)
 {
-  if (input.spec->binding != "digits")
-    return;
+    fprintf(flog, "\n================\nmonitorDataDigits\n================\n");
+  // get the input preclusters and associated digits
+  auto digits = ctx.inputs().get<gsl::span<o2::mch::Digit>>("digits");
+  auto orbits = ctx.inputs().get<gsl::span<uint64_t>>("orbits");
 
-  const auto* header = o2::header::get<header::DataHeader*>(input.header);
-  if (mPrintLevel >= 1)
-    fprintf(flog, "Header: %p\n", (void*)header);
-  if (!header)
-    return;
-  //QcInfoLogger::GetInstance() << "payloadSize: " << header->payloadSize << AliceO2::InfoLogger::InfoLogger::endm;
-  if (mPrintLevel >= 1)
-    fprintf(flog, "payloadSize: %d\n", (int)header->payloadSize);
-  if (mPrintLevel >= 1)
-    fprintf(flog, "payload: %p\n", input.payload);
-
-  std::vector<o2::mch::Digit> digits{ 0 };
-  o2::mch::Digit* digitsBuffer = NULL;
-  digitsBuffer = (o2::mch::Digit*)input.payload;
-  size_t ndigits = ((size_t)header->payloadSize / sizeof(o2::mch::Digit));
-
-  if (mPrintLevel >= 1)
-    std::cout << "There are " << ndigits << " digits in the payload" << std::endl;
-
-  o2::mch::Digit* ptr = (o2::mch::Digit*)digitsBuffer;
-  for (size_t di = 0; di < ndigits; di++) {
-    digits.push_back(*ptr);
-    ptr += 1;
+  if (mPrintLevel >= 1) {
+  std::cout<<"digits.size()="<<digits.size()<<std::endl;
   }
-
-  for (auto& d : digits) {
-    if (mPrintLevel >= 1) {
-      std::cout << fmt::format("  DE {:4d}  PAD {:5d}  ADC {:6d}  TIME ({} {} {:4d})",
-          d.getDetID(), d.getPadID(), d.getADC(), d.getTime().orbit, d.getTime().bunchCrossing, d.getTime().sampaTime);
-      std::cout << std::endl;
-    }
-    plotDigit(d);
-  }
+    
+    for (auto& orb : orbits){ //Normalement une seule fois
+        
+        if (mPrintLevel >= 0) {
+            std::cout << fmt::format(" ORBIT {}", orb);
+        }
+        
+        for (auto& d : digits) {
+            
+            if(firstorbitseen[d.getDetID()] == 0){
+                firstorbitseen[d.getDetID()] = orb;
+                std::cout<< "First orbit of DE " << d.getDetID() << " is set to " << orb <<std::endl;
+            }
+            norbits[d.getDetID()] = (orb-firstorbitseen[d.getDetID()]+1);
+            std::cout<< "Number of orbits of DE " << d.getDetID() << " is set to " << norbits[d.getDetID()] <<std::endl;
+            
+            if (mPrintLevel >= 0) {
+              std::cout << fmt::format("  DE {:4d}  PAD {:5d}  ADC {:6d}  TIME ({} {} {:4d})",
+                  d.getDetID(), d.getPadID(), d.getADC(), d.getTime().orbit, d.getTime().bunchCrossing, d.getTime().sampaTime);
+              std::cout << std::endl;
+            }
+            
+            plotDigit(d);
+        }
+   }
+    
 }
-
 
 void PhysicsTaskDigits::monitorData(o2::framework::ProcessingContext& ctx)
 {
-#ifdef QC_MCH_SAVE_TEMP_ROOTFILE_
-  if ((count % 100) == 0) {
-
-    TFile f("/tmp/qc.root", "RECREATE");
-    for (int i = 0; i < 3 * 24; i++) {
-      //mHistogramNhits[i]->Write();
-      //mHistogramADCamplitude[i]->Write();
-    }
-    //std::cout<<"mHistogramADCamplitudeDE.size() = "<<mHistogramADCamplitudeDE.size()<<"  DEs.size()="<<DEs.size()<<std::endl;
-    int nbDEs = DEs.size();
-    for (int elem = 0; elem < nbDEs; elem++) {
-      int de = DEs[elem];
-      //std::cout<<"  de="<<de<<std::endl;
-      {
-        auto h = mHistogramADCamplitudeDE.find(de);
-        if ((h != mHistogramADCamplitudeDE.end()) && (h->second != NULL)) {
-          h->second->Write();
-        }
-      }
-        
-      for(int i=0; i<4; i++){
-        {
-          auto h = mHistogramNhitsDE[i].find(de);
-          if ((h != mHistogramNhitsDE[i].end()) && (h->second != NULL)) {
-            h->second->Write();
-          }
-        }
-      }
-        
-        for(int i=0; i<2; i++){
-          {
-            auto h = mHistogramNhitsHighAmplDE[i].find(de);
-            if ((h != mHistogramNhitsHighAmplDE[i].end()) && (h->second != NULL)) {
-              h->second->Write();
-            }
-          }
-        }
-    }
-
-    f.ls();
-    f.Close();
-    if (mPrintLevel == 0) {
-      printf("count: %d\n", count);
-    }
-  }
-  if (mPrintLevel >= 1) {
-    printf("count: %d\n", count);
-  }
-  count += 1;
-#endif
-
   QcInfoLogger::GetInstance() << "monitorData" << AliceO2::InfoLogger::InfoLogger::endm;
   fprintf(flog, "\n================\nmonitorData\n================\n");
-  monitorDataReadout(ctx);
+  //monitorDataReadout(ctx);
   for (auto&& input : ctx.inputs()) {
     if (mPrintLevel >= 1) {
       QcInfoLogger::GetInstance() << "run PhysicsTaskDigits: input " << input.spec->binding << AliceO2::InfoLogger::InfoLogger::endm;
     }
     if (input.spec->binding == "digits") {
-      monitorDataDigits(input);
+      monitorDataDigits(ctx);
     }
   }
 //  monitorDataReadout(ctx);
@@ -466,6 +425,36 @@ void PhysicsTaskDigits::plotDigit(const o2::mch::Digit& digit)
         }
       }
     }
+      
+      if (cathode == 0 && ADC > 0) {
+       auto h2 = mHistogramNorbitsDE[0].find(de);
+        if ((h2 != mHistogramNorbitsDE[0].end()) && (h2->second != NULL)) {
+          int NYbins = h2->second->GetYaxis()->GetNbins();
+          int NXbins = h2->second->GetXaxis()->GetNbins();
+          for (int by = 0; by <= NYbins; by++) {
+            //float y = h2->second->GetYaxis()->GetBinCenter(by);
+            for (int bx = 0; bx <= NXbins; bx++) {
+              //float x = h2->second->GetXaxis()->GetBinCenter(bx);
+              h2->second->SetBinContent(bx, by, norbits[de]);
+            }
+          }
+        }
+      }
+      
+      if (cathode == 1 && ADC > 0) {
+       auto h2 = mHistogramNorbitsDE[1].find(de);
+        if ((h2 != mHistogramNorbitsDE[1].end()) && (h2->second != NULL)) {
+          int NYbins = h2->second->GetYaxis()->GetNbins();
+          int NXbins = h2->second->GetXaxis()->GetNbins();
+          for (int by = 0; by <= NYbins; by++) {
+            //float y = h2->second->GetYaxis()->GetBinCenter(by);
+            for (int bx = 0; bx <= NXbins; bx++) {
+              //float x = h2->second->GetXaxis()->GetBinCenter(bx);
+              h2->second->SetBinContent(bx, by, norbits[de]);
+            }
+          }
+        }
+      }
 
       
     if (cathode == 0 && ADC > 500) {
@@ -523,9 +512,16 @@ void PhysicsTaskDigits::endOfCycle()
     }
   }
 
+     mHistogramOrbits[0]->add(mHistogramNorbitsDE[0], mHistogramNorbitsDE[0]);
+     mHistogramOrbits[1]->add(mHistogramNorbitsDE[1], mHistogramNorbitsDE[1]);
+    
     mHistogramOccupancy[0]->add(mHistogramNhitsDE[1], mHistogramNhitsDE[1]);
+    mHistogramOccupancy[0]->Divide(mHistogramOrbits[0]);
     mHistogramOccupancy[1]->add(mHistogramNhitsDE[2], mHistogramNhitsDE[2]);
+    mHistogramOccupancy[1]->Divide(mHistogramOrbits[1]);
+    
     mHistogramOccupancy[2]->add(mHistogramNhitsDE[3], mHistogramNhitsDE[3]);
+    mHistogramOccupancy[2]->Divide(mHistogramOrbits[0]);
 
 #ifdef QC_MCH_SAVE_TEMP_ROOTFILE
     TFile f("/tmp/qc.root", "RECREATE");
@@ -555,6 +551,15 @@ void PhysicsTaskDigits::endOfCycle()
         }
         
         for(int i=0; i<2;i++){
+                 {
+                   auto h = mHistogramNorbitsDE[i].find(de);
+                   if ((h != mHistogramNorbitsDE[i].end()) && (h->second != NULL)) {
+                     h->second->Write();
+                   }
+                 }
+               }
+        
+        for(int i=0; i<2;i++){
           {
             auto h = mHistogramNhitsHighAmplDE[i].find(de);
             if ((h != mHistogramNhitsHighAmplDE[i].end()) && (h->second != NULL)) {
@@ -564,6 +569,8 @@ void PhysicsTaskDigits::endOfCycle()
         }
     }
     
+    mHistogramOrbits[0]->Write();
+    mHistogramOrbits[1]->Write();
     mHistogramOccupancy[0]->Write();
     mHistogramOccupancy[1]->Write();
     mHistogramOccupancy[2]->Write();

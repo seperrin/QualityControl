@@ -45,7 +45,7 @@ class PhysicsTaskDigits /*final*/ : public TaskInterface // todo add back the "f
   void startOfActivity(Activity& activity) override;
   void startOfCycle() override;
   void monitorDataReadout(o2::framework::ProcessingContext& ctx);
-  void monitorDataDigits(const o2::framework::DataRef& input);
+  void monitorDataDigits(o2::framework::ProcessingContext& ctx);
   void monitorData(o2::framework::ProcessingContext& ctx) override;
   void endOfCycle() override;
   void endOfActivity(Activity& activity) override;
@@ -60,6 +60,9 @@ class PhysicsTaskDigits /*final*/ : public TaskInterface // todo add back the "f
   int count;
   Decoder mDecoder;
   uint64_t nhits[24][40][64];
+  uint32_t norbits[1030];
+  uint32_t firstorbitseen[1030];
+    //Assumed that if there is an orbit with the B side of a DE, there is also the NB side. So Norbits B and NB are the same for the moment. 
 
   std::vector<std::unique_ptr<mch::Digit>> digits;
   mch::Digit* digitsBuffer;
@@ -70,12 +73,15 @@ class PhysicsTaskDigits /*final*/ : public TaskInterface // todo add back the "f
   std::vector<int> DEs;
   std::map<int, TH1F*> mHistogramADCamplitudeDE;
   std::map<int, TH2F*> mHistogramNhitsDE[4]; // 1 B, 1 NB, 2 B+NB
+  std::map<int, TH2F*> mHistogramNorbitsDE[2]; //1 B dt 1 NB
   std::map<int, TH2F*> mHistogramNhitsHighAmplDE[2]; // 1 B, 1 NB
     
   std::map<int, TH2F*> mHistogramOccupancyXY[3]; //Inutile
   TRandom3 rnd;
 
   GlobalHistogram* mHistogramOccupancy[3]; // 1 B, 1 NB, 1 B+NB
+  GlobalHistogram* mHistogramOrbits[2];// 1 B, 1 NB, assume B pour B+NB
+    //mHistogramOrbits[1 and 2] are the same for the moment (assumed B and NB are always taken together in the same orbit. 
 
   int mPrintLevel;
 };
