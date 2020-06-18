@@ -360,6 +360,8 @@ void GlobalHistogram::set(std::map<int, TH2F*>& histB, std::map<int, TH2F*>& his
 
     bool swapX = getLR(de) == 1;
 
+    //std::cout<<"[GlobalHistogram::set] de="<<de<<"  swapX="<<swapX<<std::endl;
+
     TH2F* hNB = nullptr;
     auto jh = histNB.find(de);
     if (jh != histNB.end()) {
@@ -374,13 +376,43 @@ void GlobalHistogram::set(std::map<int, TH2F*>& histB, std::map<int, TH2F*>& his
     float x0[2] = { xB0, xNB0 };
     float y0[2] = { yB0, yNB0 };
 
-    float xMin[2] = { xB0 - DE_WIDTH / 2, xNB0 - DE_WIDTH / 2 };
-    float xMax[2] = { xB0 + DE_WIDTH / 2, xNB0 + DE_WIDTH / 2 };
-    float yMin[2] = { yB0 - DE_HEIGHT / 2, yNB0 - DE_HEIGHT / 2 };
-    float yMax[2] = { yB0 + DE_HEIGHT / 2, yNB0 + DE_HEIGHT / 2 };
+    if(de==500 || de==509) {
+      //std::cout<<"DE "<<de<<"B   CENTER "<<x0[0]<<" "<<y0[0]<<std::endl;
+      //std::cout<<"DE "<<de<<"NB  CENTER "<<x0[1]<<" "<<y0[1]<<std::endl;
+    }
 
-    //std::cout<<"DE "<<de<<"B   LIMITS "<<xMin[0]<<" "<<xMax[0]<<", "<<yMin[0]<<" "<<yMax[0]<<std::endl;
-    //std::cout<<"DE "<<de<<"NB  LIMITS "<<xMin[1]<<" "<<xMax[1]<<", "<<yMin[1]<<" "<<yMax[1]<<std::endl;
+
+    const o2::mch::mapping::Segmentation& segment = o2::mch::mapping::segmentation(de);
+    if ((&segment) == nullptr) {
+      continue;
+    }
+    const o2::mch::mapping::CathodeSegmentation& csegmentB = segment.bending();
+    o2::mch::contour::BBox<double> bboxB = o2::mch::mapping::getBBox(csegmentB);
+    o2::mch::contour::Contour<double> envelopB = o2::mch::mapping::getEnvelop(csegmentB);
+
+    const o2::mch::mapping::CathodeSegmentation& csegmentNB = segment.nonBending();
+    o2::mch::contour::BBox<double> bboxNB = o2::mch::mapping::getBBox(csegmentNB);
+    o2::mch::contour::Contour<double> envelopNB = o2::mch::mapping::getEnvelop(csegmentNB);
+
+    if(de==500 || de==509) {
+      std::cout<<"DE "<<de<<" B  BBOX LIMITS "<<bboxB.xmin()<<" "<<bboxB.xmax()<<", "<<bboxB.ymin()<<" "<<bboxB.ymax()<<std::endl;
+      std::cout<<"DE "<<de<<" NB BBOX LIMITS "<<bboxNB.xmin()<<" "<<bboxNB.xmax()<<", "<<bboxNB.ymin()<<" "<<bboxNB.ymax()<<std::endl;
+    }
+
+    float xMin[2] = {static_cast<float>(xB0 - bboxB.width() / 2), static_cast<float>(xNB0 - bboxNB.width() / 2)};
+    float xMax[2] = {static_cast<float>(xB0 + bboxB.width() / 2), static_cast<float>(xNB0 + bboxNB.width() / 2)};
+    float yMin[2] = {static_cast<float>(yB0 + bboxB.ymin()), static_cast<float>(yNB0 + bboxNB.ymin())};
+    float yMax[2] = {static_cast<float>(yB0 + bboxB.ymax()), static_cast<float>(yNB0 + bboxNB.ymax())};
+
+    //float xMin[2] = {xB0 - DE_WIDTH / 2, xNB0 - DE_WIDTH / 2};
+    //float xMax[2] = {xB0 + DE_WIDTH / 2, xNB0 + DE_WIDTH / 2};
+    //float yMin[2] = {yB0 - DE_HEIGHT / 2, yNB0 - DE_HEIGHT / 2};
+    //float yMax[2] = {yB0 + DE_HEIGHT / 2, yNB0 + DE_HEIGHT / 2};
+
+    if(de==500 || de==509) {
+    std::cout<<"DE "<<de<<"B   LIMITS "<<xMin[0]<<" "<<xMax[0]<<", "<<yMin[0]<<" "<<yMax[0]<<std::endl;
+    std::cout<<"DE "<<de<<"NB  LIMITS "<<xMin[1]<<" "<<xMax[1]<<", "<<yMin[1]<<" "<<yMax[1]<<std::endl;
+    }
 
     float binWidthX = GetXaxis()->GetBinWidth(1);
     float binWidthY = GetYaxis()->GetBinWidth(1);
@@ -392,13 +424,16 @@ void GlobalHistogram::set(std::map<int, TH2F*>& histB, std::map<int, TH2F*>& his
         continue;
       }
 
+
       // loop on destination bins
       int binXmin = GetXaxis()->FindBin(xMin[i] + binWidthX / 2);
       int binXmax = GetXaxis()->FindBin(xMax[i] - binWidthX / 2);
       int binYmin = GetYaxis()->FindBin(yMin[i] + binWidthY / 2);
       int binYmax = GetYaxis()->FindBin(yMax[i] - binWidthY / 2);
 
+      if(de==500 || de==509) {
       //std::cout<<(i==0 ? "B " : "NB")<<"  BIN LIMITS "<<binXmin<<" "<<binXmax<<", "<<binYmin<<" "<<binYmax<<std::endl;
+      }
 
       for (int by = binYmin; by <= binYmax; by++) {
         // vertical boundaries of current bin, in DE coordinates
@@ -435,6 +470,11 @@ void GlobalHistogram::set(std::map<int, TH2F*>& histB, std::map<int, TH2F*>& his
           int srcBinXmax = hist[i]->GetXaxis()->FindBin(maxX);
           if (hist[i]->GetXaxis()->GetBinCenter(srcBinXmax) > maxX) {
             srcBinXmax -= 1;
+          }
+
+          if(by == (binYmin+binYmax)/2 && (de==500 || de==509)) {
+            //std::cout<<"DE "<<de<<(i==0 ? "B " : "NB")<<"  minX="<<minX<<"  maxX="<<maxX<<std::endl;
+            //std::cout<<"DE "<<de<<(i==0 ? "B " : "NB")<<"  srcBinXmin="<<srcBinXmin<<"  srcBinXmax="<<srcBinXmax<<std::endl;
           }
 
           // loop on source bins, and compute the sum or average
