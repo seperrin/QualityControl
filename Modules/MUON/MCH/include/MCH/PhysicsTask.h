@@ -65,8 +65,8 @@ class PhysicsTask /*final*/ : public TaskInterface // todo add back the "final" 
   int count;
   Decoder mDecoder;
   uint64_t nhits[24][40][64];
-  uint32_t norbits[1030];
-  uint32_t firstorbitseen[1030];
+  uint32_t norbits[24];
+  uint32_t firstorbitseen[24];
 
   std::vector<std::unique_ptr<mch::Digit>> digits;
   mch::Digit* digitsBuffer;

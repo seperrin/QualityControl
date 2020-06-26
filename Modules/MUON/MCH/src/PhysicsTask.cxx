@@ -10,7 +10,6 @@
 #include <TH2.h>
 #include <TFile.h>
 #include <algorithm>
-#include <iterator>
 
 #include "Headers/RAWDataHeader.h"
 #include "DPLUtils/DPLRawParser.h"
@@ -138,9 +137,11 @@ void PhysicsTask::initialize(o2::framework::InitContext& /*ctx*/)
     }
   }
 
-  for(int de = 1; de <= 1030; de++) {
-      norbits[de] = 0;
-      firstorbitseen[de] = 0;
+  for(int link = 0; link < 24; link++) {
+      norbits[link] = 0;
+      firstorbitseen[link] = 0;
+  }
+    for (int de = 0; de < 1030; de++){
     const o2::mch::mapping::Segmentation* segment = &(o2::mch::mapping::segmentation(de));
     if (segment == nullptr) continue;
 
@@ -296,29 +297,30 @@ void PhysicsTask::monitorDataDigits(o2::framework::ProcessingContext& ctx)
   }
     
     for (auto& orb : orbits){ //Normalement une seule fois
-        
+        int orbitnumber = (orb << 32) >> 32;
+        int link = (orb << 24) >> 56;
+        int fee = orb >> 40;
         if (mPrintLevel >= 0) {
-            std::cout << fmt::format(" ORBIT {}", orb);
+            std::cout << fmt::format(" ORB {} ORBITNUMBER {} LINK {} FEE {}\n", orb, orbitnumber, link, fee);
+        }
+        if(firstorbitseen[link] == 0){
+            firstorbitseen[link] = orbitnumber;
+            std::cout<< "First orbit of Link " << link << " is set to " << orbitnumber <<std::endl;
+        }
+        norbits[link] = (orbitnumber-firstorbitseen[link]+1);
+        std::cout<< "Number of orbits of Link " << link << " is set to " << norbits[link] <<std::endl;
+    }
+        
+    for (auto& d : digits) {
+    
+        if (mPrintLevel >= 0) {
+          std::cout << fmt::format("  DE {:4d}  PAD {:5d}  ADC {:6d}  TIME ({} {} {:4d})",
+              d.getDetID(), d.getPadID(), d.getADC(), d.getTime().orbit, d.getTime().bunchCrossing, d.getTime().sampaTime);
+          std::cout << std::endl;
         }
         
-        for (auto& d : digits) {
-            
-            if(firstorbitseen[d.getDetID()] == 0){
-                firstorbitseen[d.getDetID()] = orb;
-                std::cout<< "First orbit of DE " << d.getDetID() << " is set to " << orb <<std::endl;
-            }
-            norbits[d.getDetID()] = (orb-firstorbitseen[d.getDetID()]+1);
-            std::cout<< "Number of orbits of DE " << d.getDetID() << " is set to " << norbits[d.getDetID()] <<std::endl;
-            
-            if (mPrintLevel >= 0) {
-              std::cout << fmt::format("  DE {:4d}  PAD {:5d}  ADC {:6d}  TIME ({} {} {:4d})",
-                  d.getDetID(), d.getPadID(), d.getADC(), d.getTime().orbit, d.getTime().bunchCrossing, d.getTime().sampaTime);
-              std::cout << std::endl;
-            }
-            
-            plotDigit(d);
-        }
-   }
+        plotDigit(d);
+    }
     
 }
 
@@ -406,6 +408,7 @@ void PhysicsTask::plotDigit(const o2::mch::Digit& digit)
     float padSizeX = segment.padSizeX(padid);
     float padSizeY = segment.padSizeY(padid);
     int cathode = segment.isBendingPad(padid) ? 0 : 1;
+    int linkid = 0;
 
 
     if (mPrintLevel >= 1)
@@ -438,13 +441,17 @@ void PhysicsTask::plotDigit(const o2::mch::Digit& digit)
       if (cathode == 0 && ADC > 0) {
           auto h2 = mHistogramNorbitsDE.find(de);
            if ((h2 != mHistogramNorbitsDE.end()) && (h2->second != NULL)) {
-             int NYbins = h2->second->GetYaxis()->GetNbins();
-             int NXbins = h2->second->GetXaxis()->GetNbins();
-             for (int by = 0; by <= NYbins; by++) {
-               //float y = h2->second->GetYaxis()->GetBinCenter(by);
-               for (int bx = 0; bx <= NXbins; bx++) {
-                 //float x = h2->second->GetXaxis()->GetBinCenter(bx);
-                 h2->second->SetBinContent(bx, by, norbits[de]);
+//             int NYbins = h2->second->GetYaxis()->GetNbins();
+//             int NXbins = h2->second->GetXaxis()->GetNbins();
+           int binx_min = h2->second->GetXaxis()->FindBin(padX - padSizeX / 2 + 0.1);
+           int binx_max = h2->second->GetXaxis()->FindBin(padX + padSizeX / 2 - 0.1);
+           int biny_min = h2->second->GetYaxis()->FindBin(padY - padSizeY / 2 + 0.1);
+           int biny_max = h2->second->GetYaxis()->FindBin(padY + padSizeY / 2 - 0.1);
+             for (int by = biny_min; by <= biny_max; by++) {
+               float y = h2->second->GetYaxis()->GetBinCenter(by);
+               for (int bx = binx_min; bx <= binx_max; bx++) {
+                 float x = h2->second->GetXaxis()->GetBinCenter(bx);
+                 h2->second->SetBinContent(bx, by, norbits[linkid]);
                }
              }
            }
