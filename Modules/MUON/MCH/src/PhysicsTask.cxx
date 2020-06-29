@@ -507,7 +507,7 @@ void PhysicsTask::plotDigit(const o2::mch::Digit& digit)
                        link_id_boucle = mDecoder.getMapFECinv(de, dsid_boucle, link_id_boucle, ds_addr_boucle);
                       // std::cout << "link_id_boucle = " << link_id_boucle << std::endl;
                        if(link_id_boucle == link_id){
-                           std::cout << "Setting bin DE with norbits[" << linkid << "]" << " = " << norbits[linkid] << std::endl;
+                      //     std::cout << "Setting bin DE with norbits[" << linkid << "]" << " = " << norbits[linkid] << std::endl;
                            h2->second->SetBinContent(bx, by, norbits[linkid]);
                            if(!mDecoder.getMapCRUInv(link_id_boucle, cruid_boucle, linkid_boucle)){
                                std::cout << "Probleme getMapCRUInv !!!!!!!!!!!!!" << std::endl;
@@ -519,7 +519,7 @@ void PhysicsTask::plotDigit(const o2::mch::Digit& digit)
 //                               int binxy_boucle = mHistogramNorbitsElec->GetBin(xbin, ybin, 1);
 //                               int x_center_boucle = mHistogramNorbitsElec->GetXaxis()->GetBinCenter(xbin);
 //                               int y_center_boucle = mHistogramNorbitsElec->GetXaxis()->GetBinCenter(ybin);
-                               std::cout << "Setting bin Elec with norbits[" << linkid << "]" << " = " << norbits[linkid] << std::endl;
+                        //       std::cout << "Setting bin Elec with norbits[" << linkid << "]" << " = " << norbits[linkid] << std::endl;
                                mHistogramNorbitsElec->SetBinContent(xbin, ybin, norbits[linkid]);
                            }
                        }

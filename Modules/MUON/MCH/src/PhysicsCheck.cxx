@@ -54,7 +54,6 @@ Quality PhysicsCheck::check(std::map<std::string, std::shared_ptr<MonitorObject>
   std::cout<<"PhysicsCheck::check() called"<<std::endl;
   std::cout<<"================================="<<std::endl;
   Quality result = Quality::Null;
-  ofstream myfile;
 
   for (auto& [moName, mo] : *moMap) {
 
