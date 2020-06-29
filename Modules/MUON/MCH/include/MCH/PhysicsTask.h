@@ -71,6 +71,10 @@ class PhysicsTask /*final*/ : public TaskInterface // todo add back the "final" 
   std::vector<std::unique_ptr<mch::Digit>> digits;
   mch::Digit* digitsBuffer;
   int nDigits;
+    
+  TH2F* mHistogramNHitsElec;
+  TH2F* mHistogramNorbitsElec;
+  TH2F* mHistogramOccupancyElec;
 
   TH2F* mHistogramNhits[72];
   TH1F* mHistogramADCamplitude[72];

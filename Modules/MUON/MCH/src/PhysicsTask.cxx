@@ -25,6 +25,8 @@
 
 using namespace std;
 
+#define MCH_FFEID_MAX (31*2 + 1)
+
 #define QC_MCH_SAVE_TEMP_ROOTFILE 1
 
 static FILE* flog = NULL;
@@ -141,6 +143,19 @@ void PhysicsTask::initialize(o2::framework::InitContext& /*ctx*/)
       norbits[link] = 0;
       firstorbitseen[link] = 0;
   }
+    
+    mHistogramNorbitsElec = new TH2F("QcMuonChambers_Norbits_Elec", "QcMuonChambers - Norbits",
+           (MCH_FFEID_MAX+1)*12*40, 0, (MCH_FFEID_MAX+1)*12*40, 64, 0, 64);
+       getObjectsManager()->startPublishing(mHistogramNorbitsElec);
+    
+    mHistogramNHitsElec = new TH2F("QcMuonChambers_NHits_Elec", "QcMuonChambers - NHits",
+        (MCH_FFEID_MAX+1)*12*40, 0, (MCH_FFEID_MAX+1)*12*40, 64, 0, 64);
+    getObjectsManager()->startPublishing(mHistogramNHitsElec);
+    
+    mHistogramOccupancyElec = new TH2F("QcMuonChambers_Occupancy_Elec", "QcMuonChambers - Occupancy",
+        (MCH_FFEID_MAX+1)*12*40, 0, (MCH_FFEID_MAX+1)*12*40, 64, 0, 64);
+    getObjectsManager()->startPublishing(mHistogramOccupancyElec);
+    
     for (int de = 0; de < 1030; de++){
     const o2::mch::mapping::Segmentation* segment = &(o2::mch::mapping::segmentation(de));
     if (segment == nullptr) continue;
@@ -408,7 +423,32 @@ void PhysicsTask::plotDigit(const o2::mch::Digit& digit)
     float padSizeX = segment.padSizeX(padid);
     float padSizeY = segment.padSizeY(padid);
     int cathode = segment.isBendingPad(padid) ? 0 : 1;
-    int linkid = 0;
+    int dsid = segment.padDualSampaId(padid);
+    int chan_addr = segment.padDualSampaChannel(padid);
+      
+    uint32_t link_id = 0;
+    uint32_t ds_addr = 0;
+    int32_t cruid = 0;
+    int32_t linkid = 0;
+    
+    link_id = mDecoder.getMapFECinv(de, dsid, link_id, ds_addr);
+      
+    std::cout << "Le Link_id unique associé à ce digit est " << link_id << std::endl;
+      
+      if(mDecoder.getMapCRUInv(link_id, cruid, linkid)){
+          std::cout << "cruid " << cruid << std::endl;
+          std::cout << "linkid " << linkid << std::endl;
+      }
+      
+      int xbin = cruid * 12 * 40 + (linkid % 12) * 40 + ds_addr + 1;
+      int ybin = chan_addr + 1;
+      std::cout << "xbin = " << xbin << " ybin = " << ybin << std::endl;
+      std::cout << "mHistogramNHitsElec->GetBinContent(xbin, ybin) BEFORE : " << mHistogramNHitsElec->GetBinContent(xbin, ybin) << std::endl;
+      int bin_number = mHistogramNHitsElec->GetBin(xbin, ybin, 1);
+      int x_center = mHistogramNHitsElec->GetXaxis()->GetBinCenter(xbin);
+      int y_center = mHistogramNHitsElec->GetXaxis()->GetBinCenter(ybin);
+      mHistogramNHitsElec->Fill(x_center, y_center, 1);
+      std::cout << "mHistogramNHitsElec->GetBinContent(xbin, ybin) AFTER HIT ADDED : " << mHistogramNHitsElec->GetBinContent(xbin, ybin) << std::endl;
 
 
     if (mPrintLevel >= 1)
@@ -439,21 +479,55 @@ void PhysicsTask::plotDigit(const o2::mch::Digit& digit)
       }
     }
       if (cathode == 0 && ADC > 0) {
+          std::cout << "Filling NorbitsDE Histogram..." << std::endl;
           auto h2 = mHistogramNorbitsDE.find(de);
            if ((h2 != mHistogramNorbitsDE.end()) && (h2->second != NULL)) {
-//             int NYbins = h2->second->GetYaxis()->GetNbins();
-//             int NXbins = h2->second->GetXaxis()->GetNbins();
-           int binx_min = h2->second->GetXaxis()->FindBin(padX - padSizeX / 2 + 0.1);
-           int binx_max = h2->second->GetXaxis()->FindBin(padX + padSizeX / 2 - 0.1);
-           int biny_min = h2->second->GetYaxis()->FindBin(padY - padSizeY / 2 + 0.1);
-           int biny_max = h2->second->GetYaxis()->FindBin(padY + padSizeY / 2 - 0.1);
-             for (int by = biny_min; by <= biny_max; by++) {
+             int NYbins = h2->second->GetYaxis()->GetNbins();
+             int NXbins = h2->second->GetXaxis()->GetNbins();
+//           int binx_min = h2->second->GetXaxis()->FindBin(padX - padSizeX / 2 + 0.1);
+//           int binx_max = h2->second->GetXaxis()->FindBin(padX + padSizeX / 2 - 0.1);
+//           int biny_min = h2->second->GetYaxis()->FindBin(padY - padSizeY / 2 + 0.1);
+//           int biny_max = h2->second->GetYaxis()->FindBin(padY + padSizeY / 2 - 0.1);
+             for (int by = 0; by < NYbins; by++) {
                float y = h2->second->GetYaxis()->GetBinCenter(by);
-               for (int bx = binx_min; bx <= binx_max; bx++) {
+               for (int bx = 0; bx < NXbins; bx++) {
                  float x = h2->second->GetXaxis()->GetBinCenter(bx);
-                 h2->second->SetBinContent(bx, by, norbits[linkid]);
+                   
+                   int bpad = 0;
+                   int nbpad = 0;
+                   uint32_t link_id_boucle = 0;
+                   uint32_t ds_addr_boucle = 0;
+                   int32_t cruid_boucle = 0;
+                   int32_t linkid_boucle = 0;
+                   
+                   if(segment.findPadPairByPosition(x, y, bpad, nbpad)){
+                     //  std::cout << "Pad position x : " << x << " y : " << y << " has bpad : " << bpad << std::endl;
+                       int dsid_boucle = segment.padDualSampaId(bpad);
+                       int chan_addr_boucle = segment.padDualSampaChannel(bpad);
+                       link_id_boucle = mDecoder.getMapFECinv(de, dsid_boucle, link_id_boucle, ds_addr_boucle);
+                      // std::cout << "link_id_boucle = " << link_id_boucle << std::endl;
+                       if(link_id_boucle == link_id){
+                           std::cout << "Setting bin DE with norbits[" << linkid << "]" << " = " << norbits[linkid] << std::endl;
+                           h2->second->SetBinContent(bx, by, norbits[linkid]);
+                           if(!mDecoder.getMapCRUInv(link_id_boucle, cruid_boucle, linkid_boucle)){
+                               std::cout << "Probleme getMapCRUInv !!!!!!!!!!!!!" << std::endl;
+                           }
+                           if(mDecoder.getMapCRUInv(link_id_boucle, cruid_boucle, linkid_boucle)){
+                                
+                                int xbin = cruid_boucle * 12 * 40 + (linkid_boucle % 12) * 40 + ds_addr_boucle + 1;
+                                int ybin = chan_addr_boucle + 1;
+//                               int binxy_boucle = mHistogramNorbitsElec->GetBin(xbin, ybin, 1);
+//                               int x_center_boucle = mHistogramNorbitsElec->GetXaxis()->GetBinCenter(xbin);
+//                               int y_center_boucle = mHistogramNorbitsElec->GetXaxis()->GetBinCenter(ybin);
+                               std::cout << "Setting bin Elec with norbits[" << linkid << "]" << " = " << norbits[linkid] << std::endl;
+                               mHistogramNorbitsElec->SetBinContent(xbin, ybin, norbits[linkid]);
+                           }
+                       }
+                   }
+                      
                }
              }
+               std::cout << "Filling complete !" << std::endl;
            }
          }
     if (cathode == 0 && ADC > 500) {
@@ -822,14 +896,23 @@ void PhysicsTask::endOfCycle()
   mHistogramPseudoeff[2]->add(mHistogramPreclustersXY[3], mHistogramPreclustersXY[3]);
   mHistogramPseudoeff[2]->Divide(mHistogramPseudoeff[0]);
 
-    mHistogramOrbits[0]->add(mHistogramNorbitsDE, mHistogramNorbitsDE);
-    mHistogramOccupancy[0]->add(mHistogramNhitsDE, mHistogramNhitsDE);
+    mHistogramOrbits[0]->set(mHistogramNorbitsDE, mHistogramNorbitsDE);
+    mHistogramOccupancy[0]->set(mHistogramNhitsDE, mHistogramNhitsDE);
     mHistogramOccupancy[0]->Divide(mHistogramOrbits[0]);
 //    mHistogramOccupancy[1]->add(mHistogramPreclustersXY[1], mHistogramPreclustersXY[2]);
 //    mHistogramOccupancy[2]->add(mHistogramPreclustersXY[3], mHistogramPreclustersXY[3]);
+    
+    mHistogramOccupancyElec->Reset();
+    mHistogramOccupancyElec->Add(mHistogramNHitsElec);
+    mHistogramOccupancyElec->Divide(mHistogramNorbitsElec);
 
 #ifdef QC_MCH_SAVE_TEMP_ROOTFILE
     TFile f("/tmp/qc.root", "RECREATE");
+    
+    mHistogramNorbitsElec->Write();
+    mHistogramNHitsElec->Write();
+    mHistogramOccupancyElec->Write();
+    
     for (int i = 0; i < 3 * 24; i++) {
       //mHistogramNhits[i]->Write();
       //mHistogramADCamplitude[i]->Write();
