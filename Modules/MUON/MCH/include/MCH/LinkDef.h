@@ -10,4 +10,5 @@
 #pragma link C++ class o2::quality_control_modules::muonchambers::PhysicsTaskDigits + ;
 #pragma link C++ class o2::quality_control_modules::muonchambers::PhysicsTaskPreClusters + ;
 #pragma link C++ class o2::quality_control_modules::muonchambers::PedestalsCheck + ;
+#pragma link C++ class o2::quality_control_modules::muonchambers::PhysicsCheck + ;
 #endif
