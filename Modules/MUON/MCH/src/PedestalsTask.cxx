@@ -116,13 +116,13 @@ void PedestalsTask::initialize(o2::framework::InitContext& /*ctx*/)
       
        QcInfoLogger::GetInstance() << "Back to PedestalsTaskInit" << AliceO2::InfoLogger::InfoLogger::endm;
 
-    mHistogramPedestals = new TH2F("QcMuonChambers_PedestalsA", "QcMuonChambers - Pedestals",
+    mHistogramPedestals = new TH2F("QcMuonChambers_Pedestals_Elec", "QcMuonChambers - Pedestals",
         (MCH_FFEID_MAX+1)*12*40, 0, (MCH_FFEID_MAX+1)*12*40, 64, 0, 64);
     getObjectsManager()->startPublishing(mHistogramPedestals);
     mHistogramPedestalsMCH = new GlobalHistogram("QcMuonChambers_Pedestals_AllDE", "Pedestals");
     mHistogramPedestalsMCH->init();
 
-    mHistogramNoise = new TH2F("QcMuonChambers_NoiseA", "QcMuonChambers - Noise",
+    mHistogramNoise = new TH2F("QcMuonChambers_Noise_Elec", "QcMuonChambers - Noise",
         (MCH_FFEID_MAX+1)*12*40, 0, (MCH_FFEID_MAX+1)*12*40, 64, 0, 64);
     getObjectsManager()->startPublishing(mHistogramNoise);
     mHistogramNoiseMCH = new GlobalHistogram("QcMuonChambers_Noise_AllDE", "Noise");
