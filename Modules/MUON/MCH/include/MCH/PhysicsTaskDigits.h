@@ -60,13 +60,16 @@ class PhysicsTaskDigits /*final*/ : public TaskInterface // todo add back the "f
   int count;
   Decoder mDecoder;
   uint64_t nhits[24][40][64];
-  uint32_t norbits[1030];
-  uint32_t firstorbitseen[1030];
-    //Assumed that if there is an orbit with the B side of a DE, there is also the NB side. So Norbits B and NB are the same for the moment. 
+  uint32_t norbits[24];
+  uint32_t firstorbitseen[24];
 
   std::vector<std::unique_ptr<mch::Digit>> digits;
   mch::Digit* digitsBuffer;
   int nDigits;
+    
+    TH2F* mHistogramNHitsElec;
+    TH2F* mHistogramNorbitsElec;
+    TH2F* mHistogramOccupancyElec;
 
   TH2F* mHistogramNhits[72];
   TH1F* mHistogramADCamplitude[72];

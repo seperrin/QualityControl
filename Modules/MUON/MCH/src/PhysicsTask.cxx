@@ -82,9 +82,13 @@ void PhysicsTask::initialize(o2::framework::InitContext& /*ctx*/)
 
   uint32_t dsid;
   for (int cruid = 0; cruid < 3; cruid++) {
-    QcInfoLogger::GetInstance() << "JE SUIS ENTRÉ DANS LA BOUCLE CRUID " << cruid << AliceO2::InfoLogger::InfoLogger::endm;
+      if (mPrintLevel >= 1) {
+          QcInfoLogger::GetInstance() << "CRUID " << cruid << AliceO2::InfoLogger::InfoLogger::endm;
+      }
     for (int linkid = 0; linkid < 24; linkid++) {
-      QcInfoLogger::GetInstance() << "JE SUIS ENTRÉ DANS LA BOUCLE LINKID " << linkid << AliceO2::InfoLogger::InfoLogger::endm;
+        if (mPrintLevel >= 1) {
+            QcInfoLogger::GetInstance() << "LINKID " << linkid << AliceO2::InfoLogger::InfoLogger::endm;
+        }
 
       {
         int index = 24 * cruid + linkid;
