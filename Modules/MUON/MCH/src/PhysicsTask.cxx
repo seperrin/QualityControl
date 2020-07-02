@@ -100,14 +100,20 @@ void PhysicsTask::initialize(o2::framework::InitContext& /*ctx*/)
       }
 
       int32_t link_id = mDecoder.getMapCRU(cruid, linkid);
-      QcInfoLogger::GetInstance() << "  LINK_ID " << link_id << AliceO2::InfoLogger::InfoLogger::endm;
+        if (mPrintLevel >= 1) {
+            QcInfoLogger::GetInstance() << " LINK_ID " << link_id << AliceO2::InfoLogger::InfoLogger::endm;
+        }
       if (link_id == -1)
         continue;
       for (int ds_addr = 0; ds_addr < 40; ds_addr++) {
-        QcInfoLogger::GetInstance() << "JE SUIS ENTRÉ DANS LA BOUCLE DS_ADDR " << ds_addr << AliceO2::InfoLogger::InfoLogger::endm;
+          if (mPrintLevel >= 1) {
+              QcInfoLogger::GetInstance() << " DS_ADDR " << ds_addr << AliceO2::InfoLogger::InfoLogger::endm;
+          }
         uint32_t de;
         int32_t result = mDecoder.getMapFEC(link_id, ds_addr, de, dsid);
-        QcInfoLogger::GetInstance() << "C'EST LA LIGNE APRÈS LE GETMAPFEC, DE " << de << "  RESULT " << result << AliceO2::InfoLogger::InfoLogger::endm;
+          if (mPrintLevel >= 1) {
+              QcInfoLogger::GetInstance() << "GETMAPFEC, DE " << de << "  RESULT " << result << AliceO2::InfoLogger::InfoLogger::endm;
+          }
         if(result < 0) continue;
 
         if (std::find(DEs.begin(), DEs.end(), de) == DEs.end()) {
@@ -320,10 +326,14 @@ void PhysicsTask::monitorDataDigits(o2::framework::ProcessingContext& ctx)
         }
         if(firstorbitseen[link] == 0){
             firstorbitseen[link] = orbitnumber;
-            std::cout<< "First orbit of Link " << link << " is set to " << orbitnumber <<std::endl;
+            if (mPrintLevel >= 1) {
+                std::cout<< "First orbit of Link " << link << " is set to " << orbitnumber <<std::endl;
+            }
         }
         norbits[link] = (orbitnumber-firstorbitseen[link]+1);
-        std::cout<< "Number of orbits of Link " << link << " is set to " << norbits[link] <<std::endl;
+        if (mPrintLevel >= 1) {
+            std::cout<< "Number of orbits of Link " << link << " is set to " << norbits[link] <<std::endl;
+        }
     }
         
     for (auto& d : digits) {
@@ -433,23 +443,33 @@ void PhysicsTask::plotDigit(const o2::mch::Digit& digit)
     
     link_id = mDecoder.getMapFECinv(de, dsid, link_id, ds_addr);
       
-    std::cout << "Le Link_id unique associé à ce digit est " << link_id << std::endl;
+      if (mPrintLevel >= 1) {
+          std::cout << "The unique link_id associated to this digit is " << link_id << std::endl;
+      }
       
       if(mDecoder.getMapCRUInv(link_id, cruid, linkid)){
+          if (mPrintLevel >= 1) {
           std::cout << "cruid " << cruid << std::endl;
           std::cout << "linkid " << linkid << std::endl;
+          }
       }
       
       int xbin = cruid * 12 * 40 + (linkid % 12) * 40 + ds_addr + 1;
       int ybin = chan_addr + 1;
-      std::cout << "xbin = " << xbin << " ybin = " << ybin << std::endl;
-      std::cout << "mHistogramNHitsElec->GetBinContent(xbin, ybin) BEFORE : " << mHistogramNHitsElec->GetBinContent(xbin, ybin) << std::endl;
+      
+      if (mPrintLevel >= 1) {
+          std::cout << "xbin = " << xbin << " ybin = " << ybin << std::endl;
+          std::cout << "mHistogramNHitsElec->GetBinContent(xbin, ybin) BEFORE : " << mHistogramNHitsElec->GetBinContent(xbin, ybin) << std::endl;
+      }
+      
       int bin_number = mHistogramNHitsElec->GetBin(xbin, ybin, 1);
       int x_center = mHistogramNHitsElec->GetXaxis()->GetBinCenter(xbin);
       int y_center = mHistogramNHitsElec->GetXaxis()->GetBinCenter(ybin);
       mHistogramNHitsElec->Fill(x_center, y_center, 1);
-      std::cout << "mHistogramNHitsElec->GetBinContent(xbin, ybin) AFTER HIT ADDED : " << mHistogramNHitsElec->GetBinContent(xbin, ybin) << std::endl;
-
+      
+      if (mPrintLevel >= 1) {
+          std::cout << "mHistogramNHitsElec->GetBinContent(xbin, ybin) AFTER HIT ADDED : " << mHistogramNHitsElec->GetBinContent(xbin, ybin) << std::endl;
+      }
 
     if (mPrintLevel >= 1)
       fprintf(flog, "de=%d pad=%d x=%f y=%f\n", de, padid, padX, padY);
@@ -479,7 +499,9 @@ void PhysicsTask::plotDigit(const o2::mch::Digit& digit)
       }
     }
       if (cathode == 0 && ADC > 0) {
-          std::cout << "Filling NorbitsDE Histogram..." << std::endl;
+          if (mPrintLevel >= 1) {
+              std::cout << "Filling NorbitsDE Histogram..." << std::endl;
+          }
           auto h2 = mHistogramNorbitsDE.find(de);
            if ((h2 != mHistogramNorbitsDE.end()) && (h2->second != NULL)) {
              int NYbins = h2->second->GetYaxis()->GetNbins();
@@ -510,7 +532,7 @@ void PhysicsTask::plotDigit(const o2::mch::Digit& digit)
                       //     std::cout << "Setting bin DE with norbits[" << linkid << "]" << " = " << norbits[linkid] << std::endl;
                            h2->second->SetBinContent(bx, by, norbits[linkid]);
                            if(!mDecoder.getMapCRUInv(link_id_boucle, cruid_boucle, linkid_boucle)){
-                               std::cout << "Probleme getMapCRUInv !!!!!!!!!!!!!" << std::endl;
+                               std::cout << "Problem getMapCRUInv !!!!!!!!!!!!!" << std::endl;
                            }
                            if(mDecoder.getMapCRUInv(link_id_boucle, cruid_boucle, linkid_boucle)){
                                 
@@ -527,7 +549,9 @@ void PhysicsTask::plotDigit(const o2::mch::Digit& digit)
                       
                }
              }
-               std::cout << "Filling complete !" << std::endl;
+               if (mPrintLevel >= 1) {
+                   std::cout << "Filling complete !" << std::endl;
+               }
            }
          }
     if (cathode == 0 && ADC > 500) {

@@ -43,7 +43,9 @@ class PhysicsCheck : public o2::quality_control::checker::CheckInterface
 
 
  private:
-
+    int mPrintLevel;
+    double minOccupancy;
+    double maxOccupancy;
   ClassDefOverride(PhysicsCheck, 1);
 };
 

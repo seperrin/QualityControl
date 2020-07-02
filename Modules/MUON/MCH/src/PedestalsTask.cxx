@@ -256,7 +256,9 @@ void PedestalsTask::fill_noise_distributions()
           
           if (noise > 1.2){
               //We have a noisy channel
-              std::cout << "Noisy channel identified: dsid " << dsid << ", chan_addr " << chan_addr << std::endl;
+              if (mPrintLevel >= 1){
+                  std::cout << "Noisy channel identified: dsid " << dsid << ", chan_addr " << chan_addr << std::endl;
+              }
           }
 
         /*
@@ -430,7 +432,9 @@ void PedestalsTask::monitorDataReadout(o2::framework::ProcessingContext& ctx)
         nhits[hit.cru_id][hit.link_id][hit.ds_addr][hit.chan_addr]);
       
       if(rms > 1.2){
-          std::cout << "Noisy channel identified (DataReadout): cru_id " << (int)hit.cru_id << ", link_id " << (int)hit.link_id << ", ds_addr " << (int)hit.ds_addr << ", chan_addr " << (int)hit.chan_addr <<" noise: "<<rms<<std::endl;
+          if(mPrintLevel >= 1){
+              std::cout << "Noisy channel identified (DataReadout): cru_id " << (int)hit.cru_id << ", link_id " << (int)hit.link_id << ", ds_addr " << (int)hit.ds_addr << ", chan_addr " << (int)hit.chan_addr <<" noise: "<<rms<<std::endl;
+          }
           myfile.open(noisyfilename.c_str(), ios_base::out | ios_base::app);
           myfile << (int)hit.cru_id << "   " << (int)hit.link_id << "    " << (int)hit.ds_addr << "   " << (int)hit.chan_addr << "\n";
           myfile.close();

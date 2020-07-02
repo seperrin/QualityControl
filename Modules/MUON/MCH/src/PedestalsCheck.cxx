@@ -41,6 +41,8 @@ PedestalsCheck::PedestalsCheck() : minMCHpedestal(50.f), maxMCHpedestal(100.f)
     myfile.open(noisyfilename.c_str(), ios::out | ios::trunc);
     myfile << "fee_id    link_id   ds_addr  chan_addr\n";
     myfile.close();
+    
+    mPrintLevel = 0;
 }
 
 PedestalsCheck::~PedestalsCheck() {}
@@ -109,7 +111,9 @@ Quality PedestalsCheck::check(std::map<std::string, std::shared_ptr<MonitorObjec
                     int fee_id = (i-1-ds_addr-40*link_id) / (12*40);
                     int chan_addr = j-1;
                     
-                    std::cout << "Noisy channel read from Noise histogram: fee_id = "<< fee_id << ", link_id = "<< link_id << ", ds_addr = "<< ds_addr << " , chan_addr = " << chan_addr <<" with a noise of " << noise << std::endl;
+                    if(mPrintLevel >= 1){
+                        std::cout << "Noisy channel read from Noise histogram: fee_id = "<< fee_id << ", link_id = "<< link_id << ", ds_addr = "<< ds_addr << " , chan_addr = " << chan_addr <<" with a noise of " << noise << std::endl;
+                    }
                     
                     myfile.open(noisyfilename.c_str(), ios_base::out | ios_base::app);
                     myfile << fee_id << "   " << link_id << "    " << ds_addr << "   " << chan_addr << "\n";
