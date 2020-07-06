@@ -9,12 +9,12 @@
 // or submit itself to any jurisdiction.
 
 ///
-/// \file    TrendingTaskQC.h
+/// \file    MCHPostProcessing.h
 /// \author  Piotr Konopka, Sebastien Perrin
 ///
 
-#ifndef QUALITYCONTROL_TRENDINGTASKQC_H
-#define QUALITYCONTROL_TRENDINGTASKQC_H
+#ifndef QUALITYCONTROL_MCHPOSTPROCESSING_H
+#define QUALITYCONTROL_MCHPOSTPROCESSING_H
 
 #include "QualityControl/PostProcessingInterface.h"
 #include "QualityControl/TrendingTaskConfig.h"
@@ -29,6 +29,9 @@ namespace o2::quality_control::repository
 class DatabaseInterface;
 }
 
+namespace o2::quality_control_modules::muonchambers;
+{
+
 namespace o2::quality_control::postprocessing
 {
 
@@ -40,11 +43,11 @@ namespace o2::quality_control::postprocessing
 /// configured with configuration files, see Framework/postprocessing.json as an example.
 ///
 /// \author Piotr Konopka
-class TrendingTaskQC : public PostProcessingInterface
+class MCHPostProcessing : public PostProcessingInterface
 {
  public:
-  TrendingTaskQC() = default;
-  ~TrendingTaskQC() override = default;
+  MCHPostProcessing() = default;
+  ~MCHPostProcessing() override = default;
 
   void configure(std::string name, o2::configuration::ConfigurationInterface& config) override;
   void initialize(Trigger, framework::ServiceRegistry&) override;
@@ -70,5 +73,7 @@ class TrendingTaskQC : public PostProcessingInterface
 
 } // namespace o2::quality_control::postprocessing
 
-#endif //QUALITYCONTROL_TRENDINGTASKQC_H
+}
+
+#endif QUALITYCONTROL_MCHPOSTPROCESSING_H
 

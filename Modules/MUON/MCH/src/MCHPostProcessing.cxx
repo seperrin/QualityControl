@@ -9,16 +9,16 @@
 // or submit itself to any jurisdiction.
 
 ///
-/// \file    TrendingTaskQC.cxx
+/// \file    MCHPostProcessing.cxx
 /// \author  Piotr Konopka, Sebastien Perrin
 ///
 
-#include "QualityControl/TrendingTask.h"
+#include "QualityControl/MCHPostProcessing.h"
 #include "QualityControl/QcInfoLogger.h"
 #include "QualityControl/DatabaseInterface.h"
 #include "QualityControl/MonitorObject.h"
 #include "QualityControl/Reductor.h"
-#include "Framework/RootClassFactory.h"
+//#include "RootClassFactory.h"
 #include <Configuration/ConfigurationInterface.h>
 #include <TH1.h>
 #include <TCanvas.h>
@@ -27,13 +27,14 @@
 using namespace o2::quality_control;
 using namespace o2::quality_control::core;
 using namespace o2::quality_control::postprocessing;
+using namespace o2::quality_control_modules::muonchambers;
 
-void TrendingTaskQC::configure(std::string name, o2::configuration::ConfigurationInterface& config)
+void MCHPostProcessing::configure(std::string name, o2::configuration::ConfigurationInterface& config)
 {
   mConfig = TrendingTaskConfig(name, config);
 }
 
-void TrendingTaskQC::initialize(Trigger, framework::ServiceRegistry& services)
+void MCHPostProcessing::initialize(Trigger, framework::ServiceRegistry& services)
 {
   // Preparing data structure of TTree
   mTrend = std::make_unique<TTree>(); // todo: retrieve last TTree, so we continue trending. maybe do it optionally?
@@ -52,7 +53,7 @@ void TrendingTaskQC::initialize(Trigger, framework::ServiceRegistry& services)
 }
 
 //todo: see if OptimizeBaskets() indeed helps after some time
-void TrendingTaskQC::update(Trigger, framework::ServiceRegistry&)
+void MCHPostProcessing::update(Trigger, framework::ServiceRegistry&)
 {
   trendValues();
 
@@ -60,13 +61,13 @@ void TrendingTaskQC::update(Trigger, framework::ServiceRegistry&)
   storeTrend();
 }
 
-void TrendingTaskQC::finalize(Trigger, framework::ServiceRegistry&)
+void MCHPostProcessing::finalize(Trigger, framework::ServiceRegistry&)
 {
   storePlots();
   storeTrend();
 }
 
-void TrendingTaskQC::storeTrend()
+void MCHPostProcessing::storeTrend()
 {
   ILOG(Info) << "Storing the trend, entries: " << mTrend->GetEntries() << ENDM;
 
@@ -75,7 +76,7 @@ void TrendingTaskQC::storeTrend()
   mDatabase->storeMO(mo);
 }
 
-void TrendingTaskQC::trendValues()
+void MCHPostProcessing::trendValues()
 {
   // We use current date and time. This for planned processing (not history). We still might need to use the objects
   // timestamps in the end, but this would become ambiguous if there is more than one data source.
@@ -106,7 +107,7 @@ void TrendingTaskQC::trendValues()
   mTrend->Fill();
 }
 
-void TrendingTaskQC::storePlots()
+void MCHPostProcessing::storePlots()
 {
   ILOG(Info) << "Generating and storing " << mConfig.plots.size() << " plots." << ENDM;
 
