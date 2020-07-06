@@ -12,6 +12,7 @@ set(SRCS
   src/PhysicsTaskPreClusters.cxx
   src/PedestalsCheck.cxx
   src/PhysicsCheck.cxx
+  src/TrendingTaskQC.cxx
 )
 
 set(HEADERS
@@ -24,6 +25,7 @@ set(HEADERS
   include/MCH/PhysicsTaskPreClusters.h
   include/MCH/PedestalsCheck.h
   include/MCH/PhysicsCheck.h
+  include/MCH/TrendingTaskQC.h
 )
 
 # ---- Library ----
@@ -61,6 +63,7 @@ add_root_dictionary(${MODULE_NAME}
                             include/MCH/PedestalsCheck.h
                             include/MCH/PhysicsCheck.h
                             include/MCH/sampa_header.h
+                            include/MCH/TrendingTaskQC.h
                     LINKDEF include/MCH/LinkDef.h)
 
 # ---- Tests ----

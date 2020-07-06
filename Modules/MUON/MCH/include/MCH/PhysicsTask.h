@@ -67,6 +67,8 @@ class PhysicsTask /*final*/ : public TaskInterface // todo add back the "final" 
   uint64_t nhits[24][40][64];
   uint32_t norbits[24];
   uint32_t firstorbitseen[24];
+  double xsizeDE[1100];
+  double ysizeDE[1100];
 
   std::vector<std::unique_ptr<mch::Digit>> digits;
   mch::Digit* digitsBuffer;
@@ -83,6 +85,9 @@ class PhysicsTask /*final*/ : public TaskInterface // todo add back the "final" 
   std::map<int, TH2F*> mHistogramNhitsDE;
   std::map<int, TH2F*> mHistogramNorbitsDE;
   std::map<int, TH2F*> mHistogramNhitsHighAmplDE;
+    
+  std::map<int, TH2F*> mHistogramMeanNhitsPerDE;
+  std::map<int, TH2F*> mHistogramMeanNorbitsPerDE;
 
   std::map<int, TH1F*> mHistogramClchgDE;
   std::map<int, TH1F*> mHistogramClsizeDE;
@@ -95,6 +100,9 @@ class PhysicsTask /*final*/ : public TaskInterface // todo add back the "final" 
   GlobalHistogram* mHistogramPseudoeff[3];
   GlobalHistogram* mHistogramOccupancy[1];
   GlobalHistogram* mHistogramOrbits[1];
+    
+  GlobalHistogram* mHistogramMeanOccupancyPerDE[1];
+  GlobalHistogram* mHistogramMeanOrbitsPerDE[1];
 
   int mPrintLevel;
 };

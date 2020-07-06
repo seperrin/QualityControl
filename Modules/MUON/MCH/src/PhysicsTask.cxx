@@ -19,6 +19,7 @@
 #ifdef MCH_HAS_MAPPING_FACTORY
 #include "MCHMappingFactory/CreateSegmentation.h"
 #endif
+#include "MCHMappingSegContour/CathodeSegmentationContours.h"
 //#include "MCHPreClustering/PreClusterFinder.h"
 #include "QualityControl/QcInfoLogger.h"
 #include "MCH/PhysicsTask.h"
@@ -137,6 +138,10 @@ void PhysicsTask::initialize(o2::framework::InitContext& /*ctx*/)
               TString::Format("QcMuonChambers - Number of hits (DE%03d)", de), Xsize * 2, -Xsize2, Xsize2, Ysize * 2, -Ysize2, Ysize2);
           mHistogramNhitsDE.insert(make_pair(de, h2));
           getObjectsManager()->startPublishing(h2);
+          h2 = new TH2F(TString::Format("QcMuonChambers_MeanNhits_DE%03d", de),
+              TString::Format("QcMuonChambers - Mean number of hits (DE%03d)", de), Xsize * 2, -Xsize2, Xsize2, Ysize * 2, -Ysize2, Ysize2);
+          mHistogramMeanNhitsPerDE.insert(make_pair(de, h2));
+          getObjectsManager()->startPublishing(h2);
           h2 = new TH2F(TString::Format("QcMuonChambers_Nhits_HighAmpl_DE%03d", de),
               TString::Format("QcMuonChambers - Number of hits for Csum>500 (DE%03d)", de), Xsize * 2, -Xsize2, Xsize2, Ysize * 2, -Ysize2, Ysize2);
           mHistogramNhitsHighAmplDE.insert(make_pair(de, h2));
@@ -144,6 +149,9 @@ void PhysicsTask::initialize(o2::framework::InitContext& /*ctx*/)
               TString::Format("QcMuonChambers - Number of orbits (DE%03d)", de), Xsize * 2, -Xsize2, Xsize2, Ysize * 2, -Ysize2, Ysize2);
           mHistogramNorbitsDE.insert(make_pair(de, h2));
           //getObjectsManager()->startPublishing(h2);
+          h2 = new TH2F(TString::Format("QcMuonChambers_MeanNorbits_DE%03d", de),
+              TString::Format("QcMuonChambers - Mean number of orbits (DE%03d)", de), Xsize * 2, -Xsize2, Xsize2, Ysize * 2, -Ysize2, Ysize2);
+          mHistogramMeanNorbitsPerDE.insert(make_pair(de, h2));
         }
       }
     }
@@ -152,6 +160,10 @@ void PhysicsTask::initialize(o2::framework::InitContext& /*ctx*/)
   for(int link = 0; link < 24; link++) {
       norbits[link] = 0;
       firstorbitseen[link] = 0;
+  }
+  for(int de = 0; de < 1100; de++) {
+      xsizeDE[de] = 0;
+      ysizeDE[de] = 0;
   }
     
     mHistogramNorbitsElec = new TH2F("QcMuonChambers_Norbits_Elec", "QcMuonChambers - Norbits",
@@ -235,9 +247,15 @@ void PhysicsTask::initialize(o2::framework::InitContext& /*ctx*/)
 //  mHistogramOccupancy[1]->init();
 //  mHistogramOccupancy[2] = new GlobalHistogram("QcMuonChambers_Occupancy_BNB", "Occupancy - B+NB");
 //  mHistogramOccupancy[2]->init();
+  
+  mHistogramMeanOccupancyPerDE[0] = new GlobalHistogram("QcMuonChambers_MeanOccupancyPerDE_den", "Mean Occupancy per DE");
+  mHistogramMeanOccupancyPerDE[0]->init();
     
-    mHistogramOrbits[0] = new GlobalHistogram("QcMuonChambers_Orbits_den", "Orbits");
-    mHistogramOrbits[0]->init();
+  mHistogramOrbits[0] = new GlobalHistogram("QcMuonChambers_Orbits_den", "Orbits");
+  mHistogramOrbits[0]->init();
+    
+  mHistogramMeanOrbitsPerDE[0] = new GlobalHistogram("QcMuonChambers_MeanOrbitsPerDE_den", "Mean Orbits per DE");
+  mHistogramMeanOrbitsPerDE[0]->init();
 }
 
 void PhysicsTask::startOfActivity(Activity& /*activity*/)
@@ -431,6 +449,15 @@ void PhysicsTask::plotDigit(const o2::mch::Digit& digit)
 
   try {
     const o2::mch::mapping::Segmentation& segment = o2::mch::mapping::segmentation(de);
+    const o2::mch::mapping::CathodeSegmentation& csegmentB = segment.bending();
+    o2::mch::contour::BBox<double> bboxB = o2::mch::mapping::getBBox(csegmentB);
+      
+      double xmin = bboxB.xmin();
+      double xmax = bboxB.xmax();
+      xsizeDE[de] = xmax - xmin;
+      double ymin = bboxB.ymin();
+      double ymax = bboxB.ymax();
+      ysizeDE[de] = ymax - ymin;
 
     double padX = segment.padPositionX(padid);
     double padY = segment.padPositionY(padid);
@@ -960,6 +987,52 @@ void PhysicsTask::endOfCycle()
         auto h = mHistogramNhitsDE.find(de);
         if ((h != mHistogramNhitsDE.end()) && (h->second != NULL)) {
           h->second->Write();
+            float mean = 0;
+          auto hmean = mHistogramMeanNhitsPerDE.find(de);
+          if ((hmean != mHistogramMeanNhitsPerDE.end()) && (hmean->second != NULL)) {
+              int nbins_x = h->second->GetXaxis()->GetNbins();
+              int nbins_y = h->second->GetYaxis()->GetNbins();
+              for(int i=0; i < nbins_x; i++){
+                  std::cout << "i = " << i << " sum of hits = " << mean <<std::endl;
+                  for(int j=0; j < nbins_y; j++){
+                      mean += h->second->GetBinContent(i, j);
+                  }
+              }
+              mean = mean / ((nbins_x*nbins_y)*(xsizeDE[de]/200)*(ysizeDE[de]/50));
+              std::cout <<" mean of hits accounting for size of DE= " << mean <<std::endl;
+              for(int i=0; i < nbins_x; i++){
+                  for(int j=0; j < nbins_y; j++){
+                      hmean->second->SetBinContent(i, j, mean);
+                  }
+              }
+          }
+        }
+      }
+      {
+        auto h = mHistogramNorbitsDE.find(de);
+        if ((h != mHistogramNorbitsDE.end()) && (h->second != NULL)) {
+          h->second->Write();
+          float mean = 0;
+          auto hmean = mHistogramMeanNorbitsPerDE.find(de);
+          if ((hmean != mHistogramMeanNorbitsPerDE.end()) && (hmean->second != NULL)) {
+              int nbins_x = h->second->GetXaxis()->GetNbins();
+              int nbins_y = h->second->GetYaxis()->GetNbins();
+              for(int i=0; i < nbins_x; i++){
+                  std::cout << "i = " << i << " sum of orbits = " << mean <<std::endl;
+                  for(int j=0; j < nbins_y; j++){
+                      mean += h->second->GetBinContent(i, j);
+                  }
+              }
+              mean = mean / ((nbins_x*nbins_y)*(xsizeDE[de]/200)*(ysizeDE[de]/50)); //Normalisation factor, dividing by number of bins but the bins represent XY from +-100 and +-25 which is more than DE surface, hence normalisation with xsizeDe and ysizeDE.
+              std::cout <<" xsize " << xsizeDE[de] <<std::endl;
+              std::cout <<" ysize " << ysizeDE[de] <<std::endl;
+              std::cout <<" mean of orbits accounting for size of DE = " << mean <<std::endl;
+              for(int i=0; i < nbins_x; i++){
+                  for(int j=0; j < nbins_y; j++){
+                      hmean->second->SetBinContent(i, j, mean);
+                  }
+              }
+          }
         }
       }
       {
@@ -983,6 +1056,11 @@ void PhysicsTask::endOfCycle()
         }
       }
     }
+    
+    mHistogramMeanOrbitsPerDE[0]->set(mHistogramMeanNorbitsPerDE, mHistogramMeanNorbitsPerDE);
+    mHistogramMeanOccupancyPerDE[0]->set(mHistogramMeanNhitsPerDE, mHistogramMeanNhitsPerDE);
+    mHistogramMeanOccupancyPerDE[0]->Divide(mHistogramMeanOrbitsPerDE[0]);
+    
     mHistogramPseudoeff[0]->Write();
     mHistogramPseudoeff[1]->Write();
     mHistogramPseudoeff[2]->Write();
@@ -991,6 +1069,9 @@ void PhysicsTask::endOfCycle()
     mHistogramOccupancy[0]->Write();
 //    mHistogramOccupancy[1]->Write();
 //    mHistogramOccupancy[2]->Write();
+    
+    mHistogramMeanOrbitsPerDE[0]->Write();
+    mHistogramMeanOccupancyPerDE[0]->Write();
 
     //f.ls();
     f.Close();
