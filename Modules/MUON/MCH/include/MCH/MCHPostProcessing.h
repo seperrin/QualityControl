@@ -29,12 +29,9 @@ namespace o2::quality_control::repository
 class DatabaseInterface;
 }
 
-namespace o2::quality_control_modules::muonchambers;
-{
 
-namespace o2::quality_control::postprocessing
+namespace o2::quality_control_modules::muonchambers
 {
-
 /// \brief  A post-processing task which trends values, stores them in a TTree and produces plots.
 ///
 /// A post-processing task which trends objects inside QC database (QCDB). It extracts some values of one or multiple
@@ -43,16 +40,16 @@ namespace o2::quality_control::postprocessing
 /// configured with configuration files, see Framework/postprocessing.json as an example.
 ///
 /// \author Piotr Konopka
-class MCHPostProcessing : public PostProcessingInterface
+class MCHPostProcessing : public quality_control::postprocessing::PostProcessingInterface
 {
  public:
   MCHPostProcessing() = default;
   ~MCHPostProcessing() override = default;
 
-  void configure(std::string name, o2::configuration::ConfigurationInterface& config) override;
-  void initialize(Trigger, framework::ServiceRegistry&) override;
-  void update(Trigger, framework::ServiceRegistry&) override;
-  void finalize(Trigger, framework::ServiceRegistry&) override;
+  void configure(std::string name, configuration::ConfigurationInterface& config) override;
+  void initialize(quality_control::postprocessing::Trigger, framework::ServiceRegistry&) override;
+  void update(quality_control::postprocessing::Trigger, framework::ServiceRegistry&) override;
+  void finalize(quality_control::postprocessing::Trigger, framework::ServiceRegistry&) override;
 
  private:
   struct MetaData {
@@ -63,17 +60,15 @@ class MCHPostProcessing : public PostProcessingInterface
   void storePlots();
   void storeTrend();
 
-  TrendingTaskConfig mConfig;
+  quality_control::postprocessing::TrendingTaskConfig mConfig;
   MetaData mMetaData;
   UInt_t mTime;
   std::unique_ptr<TTree> mTrend;
-  std::unordered_map<std::string, std::unique_ptr<Reductor>> mReductors;
-  repository::DatabaseInterface* mDatabase = nullptr;
+  std::unordered_map<std::string, std::unique_ptr<quality_control::postprocessing::Reductor>> mReductors;
+  quality_control::repository::DatabaseInterface* mDatabase = nullptr;
 };
-
-} // namespace o2::quality_control::postprocessing
 
 }
 
-#endif QUALITYCONTROL_MCHPOSTPROCESSING_H
+#endif //QUALITYCONTROL_MCHPOSTPROCESSING_H
 

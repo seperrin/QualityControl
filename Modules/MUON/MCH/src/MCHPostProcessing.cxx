@@ -13,12 +13,12 @@
 /// \author  Piotr Konopka, Sebastien Perrin
 ///
 
-#include "QualityControl/MCHPostProcessing.h"
+#include "MCH/MCHPostProcessing.h"
 #include "QualityControl/QcInfoLogger.h"
 #include "QualityControl/DatabaseInterface.h"
 #include "QualityControl/MonitorObject.h"
 #include "QualityControl/Reductor.h"
-//#include "RootClassFactory.h"
+#include "QualityControl/RootClassFactory.h"
 #include <Configuration/ConfigurationInterface.h>
 #include <TH1.h>
 #include <TCanvas.h>
@@ -34,7 +34,7 @@ void MCHPostProcessing::configure(std::string name, o2::configuration::Configura
   mConfig = TrendingTaskConfig(name, config);
 }
 
-void MCHPostProcessing::initialize(Trigger, framework::ServiceRegistry& services)
+void MCHPostProcessing::initialize(quality_control::postprocessing::Trigger, o2::framework::ServiceRegistry& services)
 {
   // Preparing data structure of TTree
   mTrend = std::make_unique<TTree>(); // todo: retrieve last TTree, so we continue trending. maybe do it optionally?
@@ -53,7 +53,7 @@ void MCHPostProcessing::initialize(Trigger, framework::ServiceRegistry& services
 }
 
 //todo: see if OptimizeBaskets() indeed helps after some time
-void MCHPostProcessing::update(Trigger, framework::ServiceRegistry&)
+void MCHPostProcessing::update(quality_control::postprocessing::Trigger, o2::framework::ServiceRegistry&)
 {
   trendValues();
 
@@ -61,7 +61,7 @@ void MCHPostProcessing::update(Trigger, framework::ServiceRegistry&)
   storeTrend();
 }
 
-void MCHPostProcessing::finalize(Trigger, framework::ServiceRegistry&)
+void MCHPostProcessing::finalize(quality_control::postprocessing::Trigger, o2::framework::ServiceRegistry&)
 {
   storePlots();
   storeTrend();
