@@ -12,5 +12,7 @@
 #pragma link C++ class o2::quality_control_modules::muonchambers::PedestalsCheck + ;
 #pragma link C++ class o2::quality_control_modules::muonchambers::PhysicsCheck + ;
 #pragma link C++ class o2::quality_control_modules::muonchambers::MCHPostProcessing + ;
+#pragma link C++ class o2::quality_control_modules::muonchambers::TH2MCHReductor + ;
+#pragma link C++ class o2::quality_control_modules::muonchambers::GlobalHistogramReductor + ;
 
 #endif
