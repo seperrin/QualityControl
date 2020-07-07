@@ -152,6 +152,7 @@ void PhysicsTask::initialize(o2::framework::InitContext& /*ctx*/)
           h2 = new TH2F(TString::Format("QcMuonChambers_MeanNorbits_DE%03d", de),
               TString::Format("QcMuonChambers - Mean number of orbits (DE%03d)", de), Xsize * 2, -Xsize2, Xsize2, Ysize * 2, -Ysize2, Ysize2);
           mHistogramMeanNorbitsPerDE.insert(make_pair(de, h2));
+          getObjectsManager()->startPublishing(h2);
         }
       }
     }
@@ -223,7 +224,7 @@ void PhysicsTask::initialize(o2::framework::InitContext& /*ctx*/)
       hXY = new TH2F(TString::Format("QcMuonChambers_Occupancy_B_XY_%03d", de),
           TString::Format("QcMuonChambers - Occupancy XY (DE%03d B)", de), Xsize / scale, -Xsize2, Xsize2, Ysize / scale, -Ysize2, Ysize2);
       mHistogramOccupancyXY[0].insert(make_pair(de, hXY));
-
+        getObjectsManager()->startPublishing(hXY);
 //      hXY = new TH2F(TString::Format("QcMuonChambers_Occupancy_NB_XY_%03d", de),
 //           TString::Format("QcMuonChambers - Occupancy XY (DE%03d NB)", de), Xsize / scale, -Xsize2, Xsize2, Ysize / scale, -Ysize2, Ysize2);
 //      mHistogramOccupancyXY[1].insert(make_pair(de, hXY));
@@ -250,6 +251,7 @@ void PhysicsTask::initialize(o2::framework::InitContext& /*ctx*/)
   
   mHistogramMeanOccupancyPerDE[0] = new GlobalHistogram("QcMuonChambers_MeanOccupancyPerDE_den", "Mean Occupancy per DE");
   mHistogramMeanOccupancyPerDE[0]->init();
+  getObjectsManager()->startPublishing(mHistogramMeanOccupancyPerDE[0]);
     
   mHistogramOrbits[0] = new GlobalHistogram("QcMuonChambers_Orbits_den", "Orbits");
   mHistogramOrbits[0]->init();
@@ -1041,6 +1043,17 @@ void PhysicsTask::endOfCycle()
           h->second->Write();
         }
       }
+      {
+          auto h = mHistogramOccupancyXY[0].find(de);
+          if ((h != mHistogramOccupancyXY[0].end()) && (h->second != NULL)) {
+              auto hhits = mHistogramNhitsDE.find(de);
+              auto horbits = mHistogramNorbitsDE.find(de);
+              if ((hhits != mHistogramNhitsDE.end()) && (horbits != mHistogramNorbitsDE.end()) && (hhits->second != NULL) && (horbits->second != NULL)) {
+                  h->second->Divide(hhits->second,horbits->second);
+                  h->second->Write();
+          }
+        }
+      }
     }
     {
       for(int i = 0; i < 4; i++) {
@@ -1077,6 +1090,7 @@ void PhysicsTask::endOfCycle()
     f.Close();
 #endif
 }
+
 
 void PhysicsTask::endOfActivity(Activity& /*activity*/)
 {
