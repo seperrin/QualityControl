@@ -344,7 +344,12 @@ void GlobalHistogram::add(std::map<int, TH2F*>& histB, std::map<int, TH2F*>& his
   set(histB, histNB, false);
 }
 
-void GlobalHistogram::set(std::map<int, TH2F*>& histB, std::map<int, TH2F*>& histNB, bool doAverage)
+void GlobalHistogram::set_includeNull(std::map<int, TH2F*>& histB, std::map<int, TH2F*>& histNB)
+{
+  set(histB, histNB, true, true);
+}
+
+void GlobalHistogram::set(std::map<int, TH2F*>& histB, std::map<int, TH2F*>& histNB, bool doAverage, bool includeNullBins)
 {
   for (auto& ih : histB) {
     int de = ih.first;
@@ -483,7 +488,7 @@ void GlobalHistogram::set(std::map<int, TH2F*>& histB, std::map<int, TH2F*>& his
           for (int sby = srcBinYmin; sby <= srcBinYmax; sby++) {
             for (int sbx = srcBinXmin; sbx <= srcBinXmax; sbx++) {
               float val = hist[i]->GetBinContent(sbx, sby);
-              if (val == 0) {
+              if (val == 0 && !includeNullBins) {
                 continue;
               }
               nBins += 1;
