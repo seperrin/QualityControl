@@ -990,6 +990,7 @@ void PhysicsTask::endOfCycle()
         if ((h != mHistogramNhitsDE.end()) && (h->second != NULL)) {
           h->second->Write();
             float mean = 0;
+            int n_nonull_bins = 0;
           auto hmean = mHistogramMeanNhitsPerDE.find(de);
           if ((hmean != mHistogramMeanNhitsPerDE.end()) && (hmean->second != NULL)) {
               int nbins_x = h->second->GetXaxis()->GetNbins();
@@ -998,10 +999,14 @@ void PhysicsTask::endOfCycle()
                   std::cout << "i = " << i << " sum of hits = " << mean <<std::endl;
                   for(int j=0; j < nbins_y; j++){
                       mean += h->second->GetBinContent(i, j);
+                      if(h->second->GetBinContent(i, j) != 0){
+                          n_nonull_bins++;
+                      }
                   }
               }
-              mean = mean / ((nbins_x*nbins_y)*(xsizeDE[de]/200)*(ysizeDE[de]/50));
-              std::cout <<" mean of hits accounting for size of DE= " << mean <<std::endl;
+              mean = mean / n_nonull_bins;
+             // mean = mean / ((nbins_x*nbins_y)*(xsizeDE[de]/200)*(ysizeDE[de]/50));
+              std::cout <<" mean of hits (nonull) accounting for size of DE= " << mean <<std::endl;
               for(int i=0; i < nbins_x; i++){
                   for(int j=0; j < nbins_y; j++){
                       hmean->second->SetBinContent(i, j, mean);
@@ -1015,6 +1020,7 @@ void PhysicsTask::endOfCycle()
         if ((h != mHistogramNorbitsDE.end()) && (h->second != NULL)) {
           h->second->Write();
           float mean = 0;
+            int n_nonull_bins = 0;
           auto hmean = mHistogramMeanNorbitsPerDE.find(de);
           if ((hmean != mHistogramMeanNorbitsPerDE.end()) && (hmean->second != NULL)) {
               int nbins_x = h->second->GetXaxis()->GetNbins();
@@ -1023,12 +1029,17 @@ void PhysicsTask::endOfCycle()
                   std::cout << "i = " << i << " sum of orbits = " << mean <<std::endl;
                   for(int j=0; j < nbins_y; j++){
                       mean += h->second->GetBinContent(i, j);
+                      if(h->second->GetBinContent(i, j) != 0){
+                          n_nonull_bins++;
+                      }
+                      
                   }
               }
-              mean = mean / ((nbins_x*nbins_y)*(xsizeDE[de]/200)*(ysizeDE[de]/50)); //Normalisation factor, dividing by number of bins but the bins represent XY from +-100 and +-25 which is more than DE surface, hence normalisation with xsizeDe and ysizeDE.
+              mean = mean / n_nonull_bins;
+          //    mean = mean / (nbins_x*(nbins_y)*(xsizeDE[de]/200)*(ysizeDE[de]/50)); //Normalisation factor, dividing by number of bins but the bins represent XY from +-100 and +-25 which is more than DE surface, hence normalisation with xsizeDe and ysizeDE.
               std::cout <<" xsize " << xsizeDE[de] <<std::endl;
               std::cout <<" ysize " << ysizeDE[de] <<std::endl;
-              std::cout <<" mean of orbits accounting for size of DE = " << mean <<std::endl;
+              std::cout <<" mean of orbits (nonull) accounting for size of DE = " << mean <<std::endl;
               for(int i=0; i < nbins_x; i++){
                   for(int j=0; j < nbins_y; j++){
                       hmean->second->SetBinContent(i, j, mean);
