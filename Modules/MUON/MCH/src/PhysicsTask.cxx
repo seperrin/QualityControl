@@ -167,6 +167,8 @@ void PhysicsTask::initialize(o2::framework::InitContext& /*ctx*/)
       ysizeDE[de] = 0;
   }
     
+    // Histograms using the Electronic Mapping
+    
     mHistogramNorbitsElec = new TH2F("QcMuonChambers_Norbits_Elec", "QcMuonChambers - Norbits",
            (MCH_FFEID_MAX+1)*12*40, 0, (MCH_FFEID_MAX+1)*12*40, 64, 0, 64);
        getObjectsManager()->startPublishing(mHistogramNorbitsElec);
@@ -178,6 +180,7 @@ void PhysicsTask::initialize(o2::framework::InitContext& /*ctx*/)
     mHistogramOccupancyElec = new TH2F("QcMuonChambers_Occupancy_Elec", "QcMuonChambers - Occupancy",
         (MCH_FFEID_MAX+1)*12*40, 0, (MCH_FFEID_MAX+1)*12*40, 64, 0, 64);
     getObjectsManager()->startPublishing(mHistogramOccupancyElec);
+    
     
     for (int de = 0; de < 1030; de++){
     const o2::mch::mapping::Segmentation* segment = &(o2::mch::mapping::segmentation(de));
@@ -192,6 +195,9 @@ void PhysicsTask::initialize(o2::framework::InitContext& /*ctx*/)
     float Ysize = 50;
     float Ysize2 = Ysize / 2;
     float scale = 0.5;
+        
+    // Histograms using the XY Mapping
+        
     {
       TH2F* hXY = new TH2F(TString::Format("QcMuonChambers_Preclusters_Number_XY_%03d", de),
           TString::Format("QcMuonChambers - Preclusters Number XY (DE%03d B)", de), Xsize / scale, -Xsize2, Xsize2, Ysize / scale, -Ysize2, Ysize2);
@@ -225,13 +231,6 @@ void PhysicsTask::initialize(o2::framework::InitContext& /*ctx*/)
           TString::Format("QcMuonChambers - Occupancy XY (DE%03d B)", de), Xsize / scale, -Xsize2, Xsize2, Ysize / scale, -Ysize2, Ysize2);
       mHistogramOccupancyXY[0].insert(make_pair(de, hXY));
         getObjectsManager()->startPublishing(hXY);
-//      hXY = new TH2F(TString::Format("QcMuonChambers_Occupancy_NB_XY_%03d", de),
-//           TString::Format("QcMuonChambers - Occupancy XY (DE%03d NB)", de), Xsize / scale, -Xsize2, Xsize2, Ysize / scale, -Ysize2, Ysize2);
-//      mHistogramOccupancyXY[1].insert(make_pair(de, hXY));
-//
-//      hXY = new TH2F(TString::Format("QcMuonChambers_Occupancy_BNB_XY_%03d", de),
-//           TString::Format("QcMuonChambers - Occupancy XY (DE%03d B+NB)", de), Xsize / scale, -Xsize2, Xsize2, Ysize / scale, -Ysize2, Ysize2);
-//      mHistogramOccupancyXY[2].insert(make_pair(de, hXY));
     }
   }
 
@@ -244,10 +243,6 @@ void PhysicsTask::initialize(o2::framework::InitContext& /*ctx*/)
     
   mHistogramOccupancy[0] = new GlobalHistogram("QcMuonChambers_Occupancy_den", "Occupancy");
   mHistogramOccupancy[0]->init();
-//  mHistogramOccupancy[1] = new GlobalHistogram("QcMuonChambers_Occupancy", "Occupancy");
-//  mHistogramOccupancy[1]->init();
-//  mHistogramOccupancy[2] = new GlobalHistogram("QcMuonChambers_Occupancy_BNB", "Occupancy - B+NB");
-//  mHistogramOccupancy[2]->init();
   
   mHistogramMeanOccupancyPerDE[0] = new GlobalHistogram("QcMuonChambers_MeanOccupancyPerDE_den", "Mean Occupancy per DE");
   mHistogramMeanOccupancyPerDE[0]->init();
@@ -333,7 +328,7 @@ void PhysicsTask::monitorDataReadout(o2::framework::ProcessingContext& ctx)
 void PhysicsTask::monitorDataDigits(o2::framework::ProcessingContext& ctx)
 {
     fprintf(flog, "\n================\nmonitorDataDigits\n================\n");
-  // get the input preclusters and associated digits
+  // get the input preclusters and associated digits with the orbit information
   auto digits = ctx.inputs().get<gsl::span<o2::mch::Digit>>("digits");
   auto orbits = ctx.inputs().get<gsl::span<uint64_t>>("orbits");
 
@@ -453,6 +448,8 @@ void PhysicsTask::plotDigit(const o2::mch::Digit& digit)
     const o2::mch::mapping::Segmentation& segment = o2::mch::mapping::segmentation(de);
     const o2::mch::mapping::CathodeSegmentation& csegmentB = segment.bending();
     o2::mch::contour::BBox<double> bboxB = o2::mch::mapping::getBBox(csegmentB);
+      
+      // Getting the limits of each DE, for renormalisation purposes if needed (XY histograms have a fixed X,Y span while DEs are of variable size
       
       double xmin = bboxB.xmin();
       double xmax = bboxB.xmax();
@@ -956,8 +953,6 @@ void PhysicsTask::endOfCycle()
     mHistogramOrbits[0]->set(mHistogramNorbitsDE, mHistogramNorbitsDE);
     mHistogramOccupancy[0]->set(mHistogramNhitsDE, mHistogramNhitsDE);
     mHistogramOccupancy[0]->Divide(mHistogramOrbits[0]);
-//    mHistogramOccupancy[1]->add(mHistogramPreclustersXY[1], mHistogramPreclustersXY[2]);
-//    mHistogramOccupancy[2]->add(mHistogramPreclustersXY[3], mHistogramPreclustersXY[3]);
     
     mHistogramOccupancyElec->Reset();
     mHistogramOccupancyElec->Add(mHistogramNHitsElec);
@@ -986,6 +981,8 @@ void PhysicsTask::endOfCycle()
         }
       }
       {
+          // Filling mHistogramMeanNhitsPerDE with the mean number of hits seen per pad in the DE, not including null bins
+          
         auto h = mHistogramNhitsDE.find(de);
         if ((h != mHistogramNhitsDE.end()) && (h->second != NULL)) {
           h->second->Write();
@@ -996,7 +993,9 @@ void PhysicsTask::endOfCycle()
               int nbins_x = h->second->GetXaxis()->GetNbins();
               int nbins_y = h->second->GetYaxis()->GetNbins();
               for(int i=0; i < nbins_x; i++){
-                  std::cout << "i = " << i << " sum of hits = " << mean <<std::endl;
+                  if(mPrintLevel >= 1){
+                      std::cout << "i = " << i << " sum of hits = " << mean <<std::endl;
+                  }
                   for(int j=0; j < nbins_y; j++){
                       mean += h->second->GetBinContent(i, j);
                       if(h->second->GetBinContent(i, j) != 0){
@@ -1005,8 +1004,10 @@ void PhysicsTask::endOfCycle()
                   }
               }
               mean = mean / n_nonull_bins;
-             // mean = mean / ((nbins_x*nbins_y)*(xsizeDE[de]/200)*(ysizeDE[de]/50));
-              std::cout <<" mean of hits (nonull) accounting for size of DE= " << mean <<std::endl;
+             // mean = mean / ((nbins_x*nbins_y)*(xsizeDE[de]/200)*(ysizeDE[de]/50)); // To be used if we want to compute including null bins (account for the fact that some empty bins in the histogram do not belong to the DE)
+              if(mPrintLevel >= 1){
+                  std::cout <<" mean of hits (nonull) accounting for size of DE= " << mean <<std::endl;
+              }
               for(int i=0; i < nbins_x; i++){
                   for(int j=0; j < nbins_y; j++){
                       hmean->second->SetBinContent(i, j, mean);
@@ -1016,6 +1017,8 @@ void PhysicsTask::endOfCycle()
         }
       }
       {
+          // Same process with mHistogramMeanNorbitsPerDE
+          
         auto h = mHistogramNorbitsDE.find(de);
         if ((h != mHistogramNorbitsDE.end()) && (h->second != NULL)) {
           h->second->Write();
@@ -1026,7 +1029,9 @@ void PhysicsTask::endOfCycle()
               int nbins_x = h->second->GetXaxis()->GetNbins();
               int nbins_y = h->second->GetYaxis()->GetNbins();
               for(int i=0; i < nbins_x; i++){
-                  std::cout << "i = " << i << " sum of orbits = " << mean <<std::endl;
+                  if(mPrintLevel >= 1){
+                      std::cout << "i = " << i << " sum of orbits = " << mean <<std::endl;
+                  }
                   for(int j=0; j < nbins_y; j++){
                       mean += h->second->GetBinContent(i, j);
                       if(h->second->GetBinContent(i, j) != 0){
@@ -1037,9 +1042,11 @@ void PhysicsTask::endOfCycle()
               }
               mean = mean / n_nonull_bins;
           //    mean = mean / (nbins_x*(nbins_y)*(xsizeDE[de]/200)*(ysizeDE[de]/50)); //Normalisation factor, dividing by number of bins but the bins represent XY from +-100 and +-25 which is more than DE surface, hence normalisation with xsizeDe and ysizeDE.
-              std::cout <<" xsize " << xsizeDE[de] <<std::endl;
-              std::cout <<" ysize " << ysizeDE[de] <<std::endl;
-              std::cout <<" mean of orbits (nonull) accounting for size of DE = " << mean <<std::endl;
+              if(mPrintLevel >= 1){
+                  std::cout <<" xsize " << xsizeDE[de] <<std::endl;
+                  std::cout <<" ysize " << ysizeDE[de] <<std::endl;
+                  std::cout <<" mean of orbits (nonull) accounting for size of DE = " << mean <<std::endl;
+              }
               for(int i=0; i < nbins_x; i++){
                   for(int j=0; j < nbins_y; j++){
                       hmean->second->SetBinContent(i, j, mean);
@@ -1091,8 +1098,6 @@ void PhysicsTask::endOfCycle()
     
     mHistogramOrbits[0]->Write();
     mHistogramOccupancy[0]->Write();
-//    mHistogramOccupancy[1]->Write();
-//    mHistogramOccupancy[2]->Write();
     
     mHistogramMeanOrbitsPerDE[0]->Write();
     mHistogramMeanOccupancyPerDE[0]->Write();
