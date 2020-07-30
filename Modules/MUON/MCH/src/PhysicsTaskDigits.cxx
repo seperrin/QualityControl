@@ -19,6 +19,7 @@
 #ifdef MCH_HAS_MAPPING_FACTORY
 #include "MCHMappingFactory/CreateSegmentation.h"
 #endif
+#include "MCHMappingSegContour/CathodeSegmentationContours.h"
 //#include "MCHPreClustering/PreClusterFinder.h"
 #include "QualityControl/QcInfoLogger.h"
 #include "MCH/PhysicsTaskDigits.h"
@@ -176,6 +177,17 @@ void PhysicsTaskDigits::initialize(o2::framework::InitContext& /*ctx*/)
         norbits[link] = 0;
         firstorbitseen[link] = 0;
     }
+    for(int de = 0; de < 1100; de++) {
+        xsizeDE[de] = 0;
+        ysizeDE[de] = 0;
+        MeanOccupancyDE[de] = 0;
+        MeanOccupancyDECycle[de] = 0;
+        LastMeanNhitsDE[de] = 0;
+        LastMeanNorbitsDE[de] = 0;
+        NewMeanNhitsDE[de] = 0;
+        NewMeanNorbitsDE[de] = 0;
+        NbinsDE[de] = 0;
+    }
       
       mHistogramNorbitsElec = new TH2F("QcMuonChambers_Norbits_Elec", "QcMuonChambers - Norbits",
              (MCH_FFEID_MAX+1)*12*40, 0, (MCH_FFEID_MAX+1)*12*40, 64, 0, 64);
@@ -188,6 +200,13 @@ void PhysicsTaskDigits::initialize(o2::framework::InitContext& /*ctx*/)
       mHistogramOccupancyElec = new TH2F("QcMuonChambers_Occupancy_Elec", "QcMuonChambers - Occupancy",
           (MCH_FFEID_MAX+1)*12*40, 0, (MCH_FFEID_MAX+1)*12*40, 64, 0, 64);
       getObjectsManager()->startPublishing(mHistogramOccupancyElec);
+    
+    // 1D histograms for mean occupancy per DE (integrated or per elapsed cycle)
+    mMeanOccupancyPerDE = new TH1F("QcMuonChambers_MeanOccupancy", "Mean Occupancy of each DE", 1100, -0.5, 1099.5);
+    getObjectsManager()->startPublishing(mMeanOccupancyPerDE);
+    
+    mMeanOccupancyPerDECycle = new TH1F("QcMuonChambers_MeanOccupancy_OnCycle", "Mean Occupancy of each DE during the cycle", 1100, -0.5, 1099.5);
+    getObjectsManager()->startPublishing(mMeanOccupancyPerDECycle);
     
   for(int de = 1; de <= 1030; de++) {
     const o2::mch::mapping::Segmentation* segment = &(o2::mch::mapping::segmentation(de));
@@ -370,6 +389,17 @@ void PhysicsTaskDigits::plotDigit(const o2::mch::Digit& digit)
 
   try {
     const o2::mch::mapping::Segmentation& segment = o2::mch::mapping::segmentation(de);
+    const o2::mch::mapping::CathodeSegmentation& csegmentB = segment.bending();
+    o2::mch::contour::BBox<double> bboxB = o2::mch::mapping::getBBox(csegmentB);
+      
+      // Getting the limits of each DE, for renormalisation purposes if needed (XY histograms have a fixed X,Y span while DEs are of variable size
+      
+      double xmin = bboxB.xmin();
+      double xmax = bboxB.xmax();
+      xsizeDE[de] = xmax - xmin;
+      double ymin = bboxB.ymin();
+      double ymax = bboxB.ymax();
+      ysizeDE[de] = ymax - ymin;
 
     double padX = segment.padPositionX(padid);
     double padY = segment.padPositionY(padid);
@@ -700,6 +730,105 @@ void PhysicsTaskDigits::endOfCycle()
             }
           }
         }
+    }
+    
+    {
+        // Using OccupancyElec to get the mean occupancy per DE, best way
+      auto h = mHistogramOccupancyElec;
+      auto h1 = mMeanOccupancyPerDE;
+      if (h && h1) {
+          for(int de = 0; de < 1100; de++) {
+              MeanOccupancyDE[de] = 0;
+              NbinsDE[de] = 0;
+          }
+          std::cout << "On va entrer dans la boucle pour lire Elec" << std::endl;
+          for(int binx=1; binx<h->GetXaxis()->GetNbins()+1; binx++){
+              for(int biny=1; biny<h->GetYaxis()->GetNbins()+1; biny++){
+                  uint32_t ds_addr =  (binx%40)-1;
+                  uint32_t linkid = ( (binx-1-ds_addr) / 40 ) % 12;
+                  uint32_t fee_id = (binx-1-ds_addr-40*linkid) / (12*40);
+                  uint32_t chan_addr = biny-1;
+                  uint32_t de;
+                  uint32_t dsid;
+                  int32_t link_id = mDecoder.getMapCRU(fee_id, linkid);
+               //   std::cout << " linkid " << linkid << " link_id " << link_id << " fee_id " << fee_id << std::endl;
+                  if(link_id > -1){
+                      int32_t result = mDecoder.getMapFEC(link_id, ds_addr, de, dsid);
+                      std::cout << "ds_addr " << ds_addr << " link_id " << link_id << " dsid " << dsid << " de " << de << std::endl;
+                      if(result > -1){
+                          std::cout << "DE seen: " << de << "  Bin content: " << h->GetBinContent(binx, biny) <<std::endl;
+                          MeanOccupancyDE[de] += h->GetBinContent(binx, biny);
+                          NbinsDE[de] += 1;
+                          std::cout << "SumOccupancies is now: " << MeanOccupancyDE[de] <<std::endl;
+                          std::cout << "Nbins is now: " << NbinsDE[de] <<std::endl;
+                      }
+                  }
+              }
+          }
+          for(int i=0; i<1100; i++){
+              if(NbinsDE[i]>0){
+                  MeanOccupancyDE[i] /= NbinsDE[i];
+              }
+              h1->SetBinContent(i+1, MeanOccupancyDE[i]);
+          }
+          h1->Write();
+          std::cout << "MeanOccupancy of DE819 is: " << MeanOccupancyDE[819] << std::endl;
+      }
+    }
+    
+    {
+        // Using NHitsElec and Norbits to get the mean occupancy per DE on last cycle
+      auto hhits = mHistogramNHitsElec;
+      auto horbits = mHistogramNorbitsElec;
+      auto h1 = mMeanOccupancyPerDECycle;
+      if (hhits && horbits && h1) {
+          for(int de = 0; de < 1100; de++) {
+              NewMeanNhitsDE[de] = 0;
+              NewMeanNorbitsDE[de] = 0;
+          }
+          std::cout << "On va entrer dans la boucle pour lire Elec" << std::endl;
+          for(int binx=1; binx<hhits->GetXaxis()->GetNbins()+1; binx++){
+              for(int biny=1; biny<hhits->GetYaxis()->GetNbins()+1; biny++){
+                  uint32_t ds_addr =  (binx%40)-1;
+                  uint32_t linkid = ( (binx-1-ds_addr) / 40 ) % 12;
+                  uint32_t fee_id = (binx-1-ds_addr-40*linkid) / (12*40);
+                  uint32_t chan_addr = biny-1;
+                  uint32_t de;
+                  uint32_t dsid;
+                  int32_t link_id = mDecoder.getMapCRU(fee_id, linkid);
+               //   std::cout << " linkid " << linkid << " link_id " << link_id << " fee_id " << fee_id << std::endl;
+                  if(link_id > -1){
+                      int32_t result = mDecoder.getMapFEC(link_id, ds_addr, de, dsid);
+                      std::cout << "ds_addr " << ds_addr << " link_id " << link_id << " dsid " << dsid << " de " << de << std::endl;
+                      if(result > -1){
+                          std::cout << "DE seen: " << de << "  Bin content hits: " << hhits->GetBinContent(binx, biny) <<std::endl;
+                          std::cout << "DE seen: " << de << "  Bin content orbits: " << horbits->GetBinContent(binx, biny) <<std::endl;
+                          NewMeanNhitsDE[de] += hhits->GetBinContent(binx, biny);
+                          NewMeanNorbitsDE[de] += horbits->GetBinContent(binx, biny);
+                          NbinsDE[de] += 1;
+                          std::cout << "Sum Nhits is now: " << NewMeanNhitsDE[de] <<std::endl;
+                          std::cout << "Sum Norbits is now: " << NewMeanNorbitsDE[de] <<std::endl;
+                          std::cout << "Nbins is now: " << NbinsDE[de] <<std::endl;
+                      }
+                  }
+              }
+          }
+          for(int i=0; i<1100; i++){
+              MeanOccupancyDECycle[i] = 0;
+              if(NbinsDE[i]>0){
+                  NewMeanNhitsDE[i] /= NbinsDE[i];
+                  NewMeanNorbitsDE[i] /= NbinsDE[i];
+              }
+              if((NewMeanNorbitsDE[i]-LastMeanNorbitsDE[i]) > 0){
+                  MeanOccupancyDECycle[i] = (NewMeanNhitsDE[i]-LastMeanNhitsDE[i])/(NewMeanNorbitsDE[i]-LastMeanNorbitsDE[i]);
+              }
+              h1->SetBinContent(i+1, MeanOccupancyDECycle[i]);
+              LastMeanNhitsDE[i] = NewMeanNhitsDE[i];
+              LastMeanNorbitsDE[i] = NewMeanNorbitsDE[i];
+          }
+          h1->Write();
+          std::cout << "MeanOccupancy of DE819 in last cycle is: " << MeanOccupancyDECycle[819] << std::endl;
+      }
     }
     
     mHistogramOrbits[0]->Write();

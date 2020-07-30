@@ -62,6 +62,21 @@ class PhysicsTaskDigits /*final*/ : public TaskInterface // todo add back the "f
   uint64_t nhits[24][40][64];
   uint32_t norbits[24];
   uint32_t firstorbitseen[24];
+    
+    // Tailles des DE
+    double xsizeDE[1100];
+    double ysizeDE[1100];
+    
+    // Valeur de l'occupation moyenne sur chaque DE
+    double MeanOccupancyDE[1100];
+    // Valeur de l'occupation moyenne sur chaque DE sur le cycle écoulé, donc aussi arrays tampons pour faire le calcul (hits, orbits)
+    double MeanOccupancyDECycle[1100];
+    double LastMeanNhitsDE[1100];
+    double LastMeanNorbitsDE[1100];
+    double NewMeanNhitsDE[1100];
+    double NewMeanNorbitsDE[1100];
+    
+    int NbinsDE[1100];
 
   std::vector<std::unique_ptr<mch::Digit>> digits;
   mch::Digit* digitsBuffer;
@@ -70,6 +85,10 @@ class PhysicsTaskDigits /*final*/ : public TaskInterface // todo add back the "f
     TH2F* mHistogramNHitsElec;
     TH2F* mHistogramNorbitsElec;
     TH2F* mHistogramOccupancyElec;
+    
+    // TH1 de l'occupation moyenne par DE (intégré ou sur le cycle écoulé)
+    TH1F* mMeanOccupancyPerDE;
+    TH1F* mMeanOccupancyPerDECycle;
 
   TH2F* mHistogramNhits[72];
   TH1F* mHistogramADCamplitude[72];
