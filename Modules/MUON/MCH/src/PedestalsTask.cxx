@@ -87,6 +87,12 @@ void PedestalsTask::initialize(o2::framework::InitContext& /*ctx*/)
 {
   QcInfoLogger::GetInstance() << "initialize PedestalsTask" << AliceO2::InfoLogger::InfoLogger::endm;
   if (true) {
+      
+      ofstream myfile;
+      noisyfilename = "/tmp/NoisyChannelsPedestalsTask.txt";
+      myfile.open(noisyfilename.c_str(), ios::out | ios::trunc);
+      myfile << "fee_id    link_id   ds_addr  chan_addr\n";
+      myfile.close();
 
     for (int c = 0; c < MCH_MAX_CRU_IN_FLP; c++) {
       for (int l = 0; l < 24; l++) {
@@ -110,20 +116,17 @@ void PedestalsTask::initialize(o2::framework::InitContext& /*ctx*/)
       
        QcInfoLogger::GetInstance() << "Back to PedestalsTaskInit" << AliceO2::InfoLogger::InfoLogger::endm;
 
-    mHistogramPedestals = new TH2F("QcMuonChambers_Pedestals", "QcMuonChambers - Pedestals",
+    mHistogramPedestals = new TH2F("QcMuonChambers_Pedestals_Elec", "QcMuonChambers - Pedestals",
         (MCH_FFEID_MAX+1)*12*40, 0, (MCH_FFEID_MAX+1)*12*40, 64, 0, 64);
-      //QcInfoLogger::GetInstance() << "Pouet 0" << AliceO2::InfoLogger::InfoLogger::endm;
-    //getObjectsManager()->startPublishing(mHistogramPedestals);
+    getObjectsManager()->startPublishing(mHistogramPedestals);
     mHistogramPedestalsMCH = new GlobalHistogram("QcMuonChambers_Pedestals_AllDE", "Pedestals");
     mHistogramPedestalsMCH->init();
 
-    mHistogramNoise = new TH2F("QcMuonChambers_Noise", "QcMuonChambers - Noise",
+    mHistogramNoise = new TH2F("QcMuonChambers_Noise_Elec", "QcMuonChambers - Noise",
         (MCH_FFEID_MAX+1)*12*40, 0, (MCH_FFEID_MAX+1)*12*40, 64, 0, 64);
-    //getObjectsManager()->startPublishing(mHistogramNoise);
+    getObjectsManager()->startPublishing(mHistogramNoise);
     mHistogramNoiseMCH = new GlobalHistogram("QcMuonChambers_Noise_AllDE", "Noise");
     mHistogramNoiseMCH->init();
-      
-      //QcInfoLogger::GetInstance() << "Pouet 1" << AliceO2::InfoLogger::InfoLogger::endm;
 
     uint32_t dsid;
     std::vector<int> DEs;
@@ -141,8 +144,6 @@ void PedestalsTask::initialize(o2::framework::InitContext& /*ctx*/)
           int32_t ret = mDecoder.getMapFEC(link_id, ds_addr, de, dsid);
           if (ret < 0)
             continue;
-
-            //QcInfoLogger::GetInstance() << "Pouet 2" << AliceO2::InfoLogger::InfoLogger::endm;
             
           if ((std::find(DEs.begin(), DEs.end(), de)) == DEs.end()) {
             DEs.push_back(de);
@@ -171,7 +172,6 @@ void PedestalsTask::initialize(o2::framework::InitContext& /*ctx*/)
               mHistogramNoiseDistributionDE[pi][1].insert(make_pair(de, hNoiseDE));
             }
               
-              //QcInfoLogger::GetInstance() << "Pouet 3" << AliceO2::InfoLogger::InfoLogger::endm;
 
             float Xsize = 50 * 5;
             float Xsize2 = Xsize / 2;
@@ -256,7 +256,9 @@ void PedestalsTask::fill_noise_distributions()
           
           if (noise > 1.2){
               //We have a noisy channel
-              //std::cout << "Noisy channel identified: dsid " << dsid << ", chan_addr " << chan_addr << std::endl;
+              if (mPrintLevel >= 1){
+                  std::cout << "Noisy channel identified: dsid " << dsid << ", chan_addr " << chan_addr << std::endl;
+              }
           }
 
         /*
@@ -357,6 +359,8 @@ void PedestalsTask::monitorDataReadout(o2::framework::ProcessingContext& ctx)
 {
   //QcInfoLogger::GetInstance() << "monitorDataReadout" << AliceO2::InfoLogger::InfoLogger::endm;
   //fprintf(flog, "\n================\nmonitorDataReadout\n================\n");
+    
+    ofstream myfile;
 
   // Reset the hits container
   mDecoder.reset();
@@ -428,7 +432,12 @@ void PedestalsTask::monitorDataReadout(o2::framework::ProcessingContext& ctx)
         nhits[hit.cru_id][hit.link_id][hit.ds_addr][hit.chan_addr]);
       
       if(rms > 1.2){
-          //std::cout << "Noisy channel identified (DataReadout): ds_addr " << (int)hit.ds_addr << ", chan_addr " << (int)hit.chan_addr << ", cru_id " << (int)hit.cru_id << ", link_id" << (int)hit.link_id <<std::endl;
+          if(mPrintLevel >= 1){
+              std::cout << "Noisy channel identified (DataReadout): cru_id " << (int)hit.cru_id << ", link_id " << (int)hit.link_id << ", ds_addr " << (int)hit.ds_addr << ", chan_addr " << (int)hit.chan_addr <<" noise: "<<rms<<std::endl;
+          }
+          myfile.open(noisyfilename.c_str(), ios_base::out | ios_base::app);
+          myfile << (int)hit.cru_id << "   " << (int)hit.link_id << "    " << (int)hit.ds_addr << "   " << (int)hit.chan_addr << "\n";
+          myfile.close();
       }
 
     /*if( false && hit.cru_id==0 && hit.link_id==0 && hit.ds_addr==0 && hit.chan_addr==0)

@@ -19,11 +19,14 @@
 #ifdef MCH_HAS_MAPPING_FACTORY
 #include "MCHMappingFactory/CreateSegmentation.h"
 #endif
+#include "MCHMappingSegContour/CathodeSegmentationContours.h"
 //#include "MCHPreClustering/PreClusterFinder.h"
 #include "QualityControl/QcInfoLogger.h"
 #include "MCH/PhysicsTaskDigits.h"
 
 using namespace std;
+
+#define MCH_FFEID_MAX (31*2 + 1)
 
 #define QC_MCH_SAVE_TEMP_ROOTFILE 1
 
@@ -73,17 +76,20 @@ void PhysicsTaskDigits::initialize(o2::framework::InitContext& /*ctx*/)
 
   mDecoder.initialize();
 
-  mPrintLevel = 1;
+  mPrintLevel = 2;
 
   flog = stdout; //fopen("/root/qc.log", "w");
   fprintf(stdout, "PhysicsTaskDigits initialization finished\n");
 
   uint32_t dsid;
   for (int cruid = 0; cruid < 3; cruid++) {
-    QcInfoLogger::GetInstance() << "JE SUIS ENTRÉ DANS LA BOUCLE CRUID " << cruid << AliceO2::InfoLogger::InfoLogger::endm;
+      if (mPrintLevel >= 1){
+          QcInfoLogger::GetInstance() << "CRUID " << cruid << AliceO2::InfoLogger::InfoLogger::endm;
+      }
     for (int linkid = 0; linkid < 24; linkid++) {
-      QcInfoLogger::GetInstance() << "JE SUIS ENTRÉ DANS LA BOUCLE LINKID " << linkid << AliceO2::InfoLogger::InfoLogger::endm;
-
+        if (mPrintLevel >= 1){
+            QcInfoLogger::GetInstance() << "LINKID " << linkid << AliceO2::InfoLogger::InfoLogger::endm;
+        }
       {
         int index = 24 * cruid + linkid;
         mHistogramNhits[index] = new TH2F(TString::Format("QcMuonChambers_NHits_CRU%01d_LINK%02d", cruid, linkid),
@@ -98,14 +104,20 @@ void PhysicsTaskDigits::initialize(o2::framework::InitContext& /*ctx*/)
       }
 
       int32_t link_id = mDecoder.getMapCRU(cruid, linkid);
-      QcInfoLogger::GetInstance() << "  LINK_ID " << link_id << AliceO2::InfoLogger::InfoLogger::endm;
+        if (mPrintLevel >= 1){
+            QcInfoLogger::GetInstance() << "  LINK_ID " << link_id << AliceO2::InfoLogger::InfoLogger::endm;
+        }
       if (link_id == -1)
         continue;
       for (int ds_addr = 0; ds_addr < 40; ds_addr++) {
-        QcInfoLogger::GetInstance() << "JE SUIS ENTRÉ DANS LA BOUCLE DS_ADDR " << ds_addr << AliceO2::InfoLogger::InfoLogger::endm;
+          if (mPrintLevel >= 1){
+              QcInfoLogger::GetInstance() << "DS_ADDR " << ds_addr << AliceO2::InfoLogger::InfoLogger::endm;
+          }
         uint32_t de;
         int32_t result = mDecoder.getMapFEC(link_id, ds_addr, de, dsid);
-        QcInfoLogger::GetInstance() << "C'EST LA LIGNE APRÈS LE GETMAPFEC, DE " << de << "  RESULT " << result << AliceO2::InfoLogger::InfoLogger::endm;
+          if (mPrintLevel >= 1){
+              QcInfoLogger::GetInstance() << "GETMAPFEC, DE " << de << "  RESULT " << result << AliceO2::InfoLogger::InfoLogger::endm;
+          }
         if(result < 0) continue;
 
         if (std::find(DEs.begin(), DEs.end(), de) == DEs.end()) {
@@ -150,11 +162,52 @@ void PhysicsTaskDigits::initialize(o2::framework::InitContext& /*ctx*/)
                 TString::Format("QcMuonChambers - Number of hits for Csum>500 (DE%03d NB)", de), Xsize * 2, -Xsize2, Xsize2, Ysize * 2, -Ysize2, Ysize2);
             mHistogramNhitsHighAmplDE[1].insert(make_pair(de, h2));
             //getObjectsManager()->startPublishing(h2);
+            h2 = new TH2F(TString::Format("QcMuonChambers_Norbits_DE%03d_B", de),
+                TString::Format("QcMuonChambers - Number of orbits (DE%03d B)", de), Xsize * 2, -Xsize2, Xsize2, Ysize * 2, -Ysize2, Ysize2);
+            mHistogramNorbitsDE[0].insert(make_pair(de, h2));
+            h2 = new TH2F(TString::Format("QcMuonChambers_Norbits_DE%03d_NB", de),
+                TString::Format("QcMuonChambers - Number of orbits (DE%03d NB)", de), Xsize * 2, -Xsize2, Xsize2, Ysize * 2, -Ysize2, Ysize2);
+            mHistogramNorbitsDE[1].insert(make_pair(de, h2));
         }
       }
     }
   }
-
+    
+    for(int link = 0; link < 24; link++) {
+        norbits[link] = 0;
+        firstorbitseen[link] = 0;
+    }
+    for(int de = 0; de < 1100; de++) {
+        xsizeDE[de] = 0;
+        ysizeDE[de] = 0;
+        MeanOccupancyDE[de] = 0;
+        MeanOccupancyDECycle[de] = 0;
+        LastMeanNhitsDE[de] = 0;
+        LastMeanNorbitsDE[de] = 0;
+        NewMeanNhitsDE[de] = 0;
+        NewMeanNorbitsDE[de] = 0;
+        NbinsDE[de] = 0;
+    }
+      
+      mHistogramNorbitsElec = new TH2F("QcMuonChambers_Norbits_Elec", "QcMuonChambers - Norbits",
+             (MCH_FFEID_MAX+1)*12*40, 0, (MCH_FFEID_MAX+1)*12*40, 64, 0, 64);
+         getObjectsManager()->startPublishing(mHistogramNorbitsElec);
+      
+      mHistogramNHitsElec = new TH2F("QcMuonChambers_NHits_Elec", "QcMuonChambers - NHits",
+          (MCH_FFEID_MAX+1)*12*40, 0, (MCH_FFEID_MAX+1)*12*40, 64, 0, 64);
+      getObjectsManager()->startPublishing(mHistogramNHitsElec);
+      
+      mHistogramOccupancyElec = new TH2F("QcMuonChambers_Occupancy_Elec", "QcMuonChambers - Occupancy",
+          (MCH_FFEID_MAX+1)*12*40, 0, (MCH_FFEID_MAX+1)*12*40, 64, 0, 64);
+      getObjectsManager()->startPublishing(mHistogramOccupancyElec);
+    
+    // 1D histograms for mean occupancy per DE (integrated or per elapsed cycle)
+    mMeanOccupancyPerDE = new TH1F("QcMuonChambers_MeanOccupancy", "Mean Occupancy of each DE", 1100, -0.5, 1099.5);
+    getObjectsManager()->startPublishing(mMeanOccupancyPerDE);
+    
+    mMeanOccupancyPerDECycle = new TH1F("QcMuonChambers_MeanOccupancy_OnCycle", "Mean Occupancy of each DE during the cycle", 1100, -0.5, 1099.5);
+    getObjectsManager()->startPublishing(mMeanOccupancyPerDECycle);
+    
   for(int de = 1; de <= 1030; de++) {
     const o2::mch::mapping::Segmentation* segment = &(o2::mch::mapping::segmentation(de));
     if (segment == nullptr) continue;
@@ -185,6 +238,11 @@ void PhysicsTaskDigits::initialize(o2::framework::InitContext& /*ctx*/)
   mHistogramOccupancy[1]->init();
   mHistogramOccupancy[2] = new GlobalHistogram("QcMuonChambers_Occupancy_BNB", "Occupancy - B+NB");
   mHistogramOccupancy[2]->init();
+    
+    mHistogramOrbits[0] = new GlobalHistogram("QcMuonChambers_Orbits_denB", "Orbits");
+    mHistogramOrbits[0]->init();
+    mHistogramOrbits[1] = new GlobalHistogram("QcMuonChambers_Orbits_NB", "Orbits");
+    mHistogramOrbits[1]->init();
 }
 
 void PhysicsTaskDigits::startOfActivity(Activity& /*activity*/)
@@ -257,109 +315,60 @@ void PhysicsTaskDigits::monitorDataReadout(o2::framework::ProcessingContext& ctx
 }
 
 
-void PhysicsTaskDigits::monitorDataDigits(const o2::framework::DataRef& input)
+void PhysicsTaskDigits::monitorDataDigits(o2::framework::ProcessingContext& ctx)
 {
-  if (input.spec->binding != "digits")
-    return;
+    fprintf(flog, "\n================\nmonitorDataDigits\n================\n");
+  // get the input preclusters and associated digits
+  auto digits = ctx.inputs().get<gsl::span<o2::mch::Digit>>("digits");
+  auto orbits = ctx.inputs().get<gsl::span<uint64_t>>("orbits");
 
-  const auto* header = o2::header::get<header::DataHeader*>(input.header);
-  if (mPrintLevel >= 1)
-    fprintf(flog, "Header: %p\n", (void*)header);
-  if (!header)
-    return;
-  //QcInfoLogger::GetInstance() << "payloadSize: " << header->payloadSize << AliceO2::InfoLogger::InfoLogger::endm;
-  if (mPrintLevel >= 1)
-    fprintf(flog, "payloadSize: %d\n", (int)header->payloadSize);
-  if (mPrintLevel >= 1)
-    fprintf(flog, "payload: %p\n", input.payload);
-
-  std::vector<o2::mch::Digit> digits{ 0 };
-  o2::mch::Digit* digitsBuffer = NULL;
-  digitsBuffer = (o2::mch::Digit*)input.payload;
-  size_t ndigits = ((size_t)header->payloadSize / sizeof(o2::mch::Digit));
-
-  if (mPrintLevel >= 1)
-    std::cout << "There are " << ndigits << " digits in the payload" << std::endl;
-
-  o2::mch::Digit* ptr = (o2::mch::Digit*)digitsBuffer;
-  for (size_t di = 0; di < ndigits; di++) {
-    digits.push_back(*ptr);
-    ptr += 1;
+  if (mPrintLevel >= 1) {
+  std::cout<<"digits.size()="<<digits.size()<<std::endl;
   }
-
-  for (auto& d : digits) {
-    if (mPrintLevel >= 1) {
-      std::cout << fmt::format("  DE {:4d}  PAD {:5d}  ADC {:6d}  TIME ({} {} {:4d})",
-          d.getDetID(), d.getPadID(), d.getADC(), d.getTime().orbit, d.getTime().bunchCrossing, d.getTime().sampaTime);
-      std::cout << std::endl;
+    
+    for (auto& orb : orbits){ //Normalement une seule fois
+        int orbitnumber = (orb << 32) >> 32;
+        int link = (orb << 24) >> 56;
+        int fee = orb >> 40;
+        if (mPrintLevel >= 0) {
+            std::cout << fmt::format(" ORB {} ORBITNUMBER {} LINK {} FEE {}\n", orb, orbitnumber, link, fee);
+        }
+        if(firstorbitseen[link] == 0){
+            firstorbitseen[link] = orbitnumber;
+            if (mPrintLevel >= 1) {
+                std::cout<< "First orbit of Link " << link << " is set to " << orbitnumber <<std::endl;
+            }
+        }
+        norbits[link] = (orbitnumber-firstorbitseen[link]+1);
+        if (mPrintLevel >= 1) {
+            std::cout<< "Number of orbits of Link " << link << " is set to " << norbits[link] <<std::endl;
+        }
     }
-    plotDigit(d);
-  }
+        
+    for (auto& d : digits) {
+    
+        if (mPrintLevel >= 0) {
+          std::cout << fmt::format("  DE {:4d}  PAD {:5d}  ADC {:6d}  TIME ({} {} {:4d})",
+              d.getDetID(), d.getPadID(), d.getADC(), d.getTime().orbit, d.getTime().bunchCrossing, d.getTime().sampaTime);
+          std::cout << std::endl;
+        }
+        
+        plotDigit(d);
+    }
+    
 }
-
 
 void PhysicsTaskDigits::monitorData(o2::framework::ProcessingContext& ctx)
 {
-#ifdef QC_MCH_SAVE_TEMP_ROOTFILE_
-  if ((count % 100) == 0) {
-
-    TFile f("/tmp/qc.root", "RECREATE");
-    for (int i = 0; i < 3 * 24; i++) {
-      //mHistogramNhits[i]->Write();
-      //mHistogramADCamplitude[i]->Write();
-    }
-    //std::cout<<"mHistogramADCamplitudeDE.size() = "<<mHistogramADCamplitudeDE.size()<<"  DEs.size()="<<DEs.size()<<std::endl;
-    int nbDEs = DEs.size();
-    for (int elem = 0; elem < nbDEs; elem++) {
-      int de = DEs[elem];
-      //std::cout<<"  de="<<de<<std::endl;
-      {
-        auto h = mHistogramADCamplitudeDE.find(de);
-        if ((h != mHistogramADCamplitudeDE.end()) && (h->second != NULL)) {
-          h->second->Write();
-        }
-      }
-        
-      for(int i=0; i<4; i++){
-        {
-          auto h = mHistogramNhitsDE[i].find(de);
-          if ((h != mHistogramNhitsDE[i].end()) && (h->second != NULL)) {
-            h->second->Write();
-          }
-        }
-      }
-        
-        for(int i=0; i<2; i++){
-          {
-            auto h = mHistogramNhitsHighAmplDE[i].find(de);
-            if ((h != mHistogramNhitsHighAmplDE[i].end()) && (h->second != NULL)) {
-              h->second->Write();
-            }
-          }
-        }
-    }
-
-    f.ls();
-    f.Close();
-    if (mPrintLevel == 0) {
-      printf("count: %d\n", count);
-    }
-  }
-  if (mPrintLevel >= 1) {
-    printf("count: %d\n", count);
-  }
-  count += 1;
-#endif
-
   QcInfoLogger::GetInstance() << "monitorData" << AliceO2::InfoLogger::InfoLogger::endm;
   fprintf(flog, "\n================\nmonitorData\n================\n");
-  monitorDataReadout(ctx);
+  //monitorDataReadout(ctx);
   for (auto&& input : ctx.inputs()) {
     if (mPrintLevel >= 1) {
       QcInfoLogger::GetInstance() << "run PhysicsTaskDigits: input " << input.spec->binding << AliceO2::InfoLogger::InfoLogger::endm;
     }
     if (input.spec->binding == "digits") {
-      monitorDataDigits(input);
+      monitorDataDigits(ctx);
     }
   }
 //  monitorDataReadout(ctx);
@@ -380,13 +389,60 @@ void PhysicsTaskDigits::plotDigit(const o2::mch::Digit& digit)
 
   try {
     const o2::mch::mapping::Segmentation& segment = o2::mch::mapping::segmentation(de);
+    const o2::mch::mapping::CathodeSegmentation& csegmentB = segment.bending();
+    o2::mch::contour::BBox<double> bboxB = o2::mch::mapping::getBBox(csegmentB);
+      
+      // Getting the limits of each DE, for renormalisation purposes if needed (XY histograms have a fixed X,Y span while DEs are of variable size
+      
+      double xmin = bboxB.xmin();
+      double xmax = bboxB.xmax();
+      xsizeDE[de] = xmax - xmin;
+      double ymin = bboxB.ymin();
+      double ymax = bboxB.ymax();
+      ysizeDE[de] = ymax - ymin;
 
     double padX = segment.padPositionX(padid);
     double padY = segment.padPositionY(padid);
     float padSizeX = segment.padSizeX(padid);
     float padSizeY = segment.padSizeY(padid);
     int cathode = segment.isBendingPad(padid) ? 0 : 1;
+    int dsid = segment.padDualSampaId(padid);
+    int chan_addr = segment.padDualSampaChannel(padid);
 
+    uint32_t link_id = 0;
+    uint32_t ds_addr = 0;
+    int32_t cruid = 0;
+    int32_t linkid = 0;
+      
+    link_id = mDecoder.getMapFECinv(de, dsid, link_id, ds_addr);
+      
+    if (mPrintLevel >= 1) {
+        std::cout << "The unique link_id associated to this digit is " << link_id << std::endl;
+    }
+    
+    if(mDecoder.getMapCRUInv(link_id, cruid, linkid)){
+        if (mPrintLevel >= 1) {
+        std::cout << "cruid " << cruid << std::endl;
+        std::cout << "linkid " << linkid << std::endl;
+        }
+    }
+    
+    int xbin = cruid * 12 * 40 + (linkid % 12) * 40 + ds_addr + 1;
+    int ybin = chan_addr + 1;
+    
+    if (mPrintLevel >= 1) {
+        std::cout << "xbin = " << xbin << " ybin = " << ybin << std::endl;
+        std::cout << "mHistogramNHitsElec->GetBinContent(xbin, ybin) BEFORE : " << mHistogramNHitsElec->GetBinContent(xbin, ybin) << std::endl;
+    }
+    
+    int bin_number = mHistogramNHitsElec->GetBin(xbin, ybin, 1);
+    int x_center = mHistogramNHitsElec->GetXaxis()->GetBinCenter(xbin);
+    int y_center = mHistogramNHitsElec->GetXaxis()->GetBinCenter(ybin);
+    mHistogramNHitsElec->Fill(x_center, y_center, 1);
+    
+    if (mPrintLevel >= 1) {
+        std::cout << "mHistogramNHitsElec->GetBinContent(xbin, ybin) AFTER HIT ADDED : " << mHistogramNHitsElec->GetBinContent(xbin, ybin) << std::endl;
+    }
 
     if (mPrintLevel >= 1)
       fprintf(flog, "de=%d pad=%d x=%f y=%f\n", de, padid, padX, padY);
@@ -466,6 +522,93 @@ void PhysicsTaskDigits::plotDigit(const o2::mch::Digit& digit)
         }
       }
     }
+      
+        if (cathode == 0 && ADC > 0){
+                auto h2 = mHistogramNorbitsDE[0].find(de);
+                 if ((h2 != mHistogramNorbitsDE[0].end()) && (h2->second != NULL)) {
+                   int NYbins = h2->second->GetYaxis()->GetNbins();
+                   int NXbins = h2->second->GetXaxis()->GetNbins();
+                   for (int by = 0; by < NYbins; by++) {
+                     float y = h2->second->GetYaxis()->GetBinCenter(by);
+                     for (int bx = 0; bx < NXbins; bx++) {
+                       float x = h2->second->GetXaxis()->GetBinCenter(bx);
+                         
+                         int bpad = 0;
+                         int nbpad = 0;
+                         uint32_t link_id_boucle = 0;
+                         uint32_t ds_addr_boucle = 0;
+                         int32_t cruid_boucle = 0;
+                         int32_t linkid_boucle = 0;
+                         
+                         if(segment.findPadPairByPosition(x, y, bpad, nbpad)){
+                           //  std::cout << "Pad position x : " << x << " y : " << y << " has bpad : " << bpad << std::endl;
+                             int dsid_boucle = segment.padDualSampaId(bpad);
+                             int chan_addr_boucle = segment.padDualSampaChannel(bpad);
+                             link_id_boucle = mDecoder.getMapFECinv(de, dsid_boucle, link_id_boucle, ds_addr_boucle);
+                            // std::cout << "link_id_boucle = " << link_id_boucle << std::endl;
+                             if(link_id_boucle == link_id){
+                            //     std::cout << "Setting bin DE with norbits[" << linkid << "]" << " = " << norbits[linkid] << std::endl;
+                                 h2->second->SetBinContent(bx, by, norbits[linkid]);
+                                 if(!mDecoder.getMapCRUInv(link_id_boucle, cruid_boucle, linkid_boucle)){
+                                     std::cout << "Problem getMapCRUInv !!!!!!!!!!!!!" << std::endl;
+                                 }
+                                 if(mDecoder.getMapCRUInv(link_id_boucle, cruid_boucle, linkid_boucle)){
+                                      
+                                      int xbin = cruid_boucle * 12 * 40 + (linkid_boucle % 12) * 40 + ds_addr_boucle + 1;
+                                      int ybin = chan_addr_boucle + 1;
+                                     mHistogramNorbitsElec->SetBinContent(xbin, ybin, norbits[linkid]);
+                                 }
+                             }
+                         }
+                            
+                     }
+                   }
+                 }
+               }
+      
+      
+      if (cathode == 1 && ADC > 0) {
+       auto h2 = mHistogramNorbitsDE[1].find(de);
+        if ((h2 != mHistogramNorbitsDE[1].end()) && (h2->second != NULL)) {
+          int NYbins = h2->second->GetYaxis()->GetNbins();
+          int NXbins = h2->second->GetXaxis()->GetNbins();
+          for (int by = 0; by < NYbins; by++) {
+            float y = h2->second->GetYaxis()->GetBinCenter(by);
+            for (int bx = 0; bx < NXbins; bx++) {
+              float x = h2->second->GetXaxis()->GetBinCenter(bx);
+                
+                int bpad = 0;
+                int nbpad = 0;
+                uint32_t link_id_boucle = 0;
+                uint32_t ds_addr_boucle = 0;
+                int32_t cruid_boucle = 0;
+                int32_t linkid_boucle = 0;
+                
+                if(segment.findPadPairByPosition(x, y, bpad, nbpad)){
+                  //  std::cout << "Pad position x : " << x << " y : " << y << " has bpad : " << bpad << std::endl;
+                    int dsid_boucle = segment.padDualSampaId(nbpad);
+                    int chan_addr_boucle = segment.padDualSampaChannel(nbpad);
+                    link_id_boucle = mDecoder.getMapFECinv(de, dsid_boucle, link_id_boucle, ds_addr_boucle);
+                   // std::cout << "link_id_boucle = " << link_id_boucle << std::endl;
+                    if(link_id_boucle == link_id){
+                   //     std::cout << "Setting bin DE with norbits[" << linkid << "]" << " = " << norbits[linkid] << std::endl;
+                        h2->second->SetBinContent(bx, by, norbits[linkid]);
+                        if(!mDecoder.getMapCRUInv(link_id_boucle, cruid_boucle, linkid_boucle)){
+                            std::cout << "Problem getMapCRUInv !!!!!!!!!!!!!" << std::endl;
+                        }
+                        if(mDecoder.getMapCRUInv(link_id_boucle, cruid_boucle, linkid_boucle)){
+                             
+                             int xbin = cruid_boucle * 12 * 40 + (linkid_boucle % 12) * 40 + ds_addr_boucle + 1;
+                             int ybin = chan_addr_boucle + 1;
+                            mHistogramNorbitsElec->SetBinContent(xbin, ybin, norbits[linkid]);
+                        }
+                    }
+                }
+                   
+            }
+          }
+        }
+      }
 
       
     if (cathode == 0 && ADC > 500) {
@@ -523,12 +666,28 @@ void PhysicsTaskDigits::endOfCycle()
     }
   }
 
-    mHistogramOccupancy[0]->add(mHistogramNhitsDE[1], mHistogramNhitsDE[1]);
-    mHistogramOccupancy[1]->add(mHistogramNhitsDE[2], mHistogramNhitsDE[2]);
-    mHistogramOccupancy[2]->add(mHistogramNhitsDE[3], mHistogramNhitsDE[3]);
+     mHistogramOrbits[0]->set(mHistogramNorbitsDE[0], mHistogramNorbitsDE[0]);
+     mHistogramOrbits[1]->set(mHistogramNorbitsDE[1], mHistogramNorbitsDE[1]);
+    
+    mHistogramOccupancy[0]->set(mHistogramNhitsDE[1], mHistogramNhitsDE[1]);
+    mHistogramOccupancy[0]->Divide(mHistogramOrbits[0]);
+    mHistogramOccupancy[1]->set(mHistogramNhitsDE[2], mHistogramNhitsDE[2]);
+    mHistogramOccupancy[1]->Divide(mHistogramOrbits[1]);
+    
+    mHistogramOccupancy[2]->set(mHistogramNhitsDE[3], mHistogramNhitsDE[3]);
+    mHistogramOccupancy[2]->Divide(mHistogramOrbits[0]);
+    
+    mHistogramOccupancyElec->Reset();
+    mHistogramOccupancyElec->Add(mHistogramNHitsElec);
+    mHistogramOccupancyElec->Divide(mHistogramNorbitsElec);
 
 #ifdef QC_MCH_SAVE_TEMP_ROOTFILE
     TFile f("/tmp/qc.root", "RECREATE");
+    
+    mHistogramNorbitsElec->Write();
+    mHistogramNHitsElec->Write();
+    mHistogramOccupancyElec->Write();
+    
     for (int i = 0; i < 3 * 24; i++) {
       //mHistogramNhits[i]->Write();
       //mHistogramADCamplitude[i]->Write();
@@ -555,6 +714,15 @@ void PhysicsTaskDigits::endOfCycle()
         }
         
         for(int i=0; i<2;i++){
+                 {
+                   auto h = mHistogramNorbitsDE[i].find(de);
+                   if ((h != mHistogramNorbitsDE[i].end()) && (h->second != NULL)) {
+                     h->second->Write();
+                   }
+                 }
+               }
+        
+        for(int i=0; i<2;i++){
           {
             auto h = mHistogramNhitsHighAmplDE[i].find(de);
             if ((h != mHistogramNhitsHighAmplDE[i].end()) && (h->second != NULL)) {
@@ -564,6 +732,107 @@ void PhysicsTaskDigits::endOfCycle()
         }
     }
     
+    {
+        // Using OccupancyElec to get the mean occupancy per DE, best way
+      auto h = mHistogramOccupancyElec;
+      auto h1 = mMeanOccupancyPerDE;
+      if (h && h1) {
+          for(int de = 0; de < 1100; de++) {
+              MeanOccupancyDE[de] = 0;
+              NbinsDE[de] = 0;
+          }
+          std::cout << "On va entrer dans la boucle pour lire Elec" << std::endl;
+          for(int binx=1; binx<h->GetXaxis()->GetNbins()+1; binx++){
+              for(int biny=1; biny<h->GetYaxis()->GetNbins()+1; biny++){
+                  uint32_t ds_addr =  (binx%40)-1;
+                  uint32_t linkid = ( (binx-1-ds_addr) / 40 ) % 12;
+                  uint32_t fee_id = (binx-1-ds_addr-40*linkid) / (12*40);
+                  uint32_t chan_addr = biny-1;
+                  uint32_t de;
+                  uint32_t dsid;
+                  int32_t link_id = mDecoder.getMapCRU(fee_id, linkid);
+               //   std::cout << " linkid " << linkid << " link_id " << link_id << " fee_id " << fee_id << std::endl;
+                  if(link_id > -1){
+                      int32_t result = mDecoder.getMapFEC(link_id, ds_addr, de, dsid);
+                      std::cout << "ds_addr " << ds_addr << " link_id " << link_id << " dsid " << dsid << " de " << de << std::endl;
+                      if(result > -1){
+                          std::cout << "DE seen: " << de << "  Bin content: " << h->GetBinContent(binx, biny) <<std::endl;
+                          MeanOccupancyDE[de] += h->GetBinContent(binx, biny);
+                          NbinsDE[de] += 1;
+                          std::cout << "SumOccupancies is now: " << MeanOccupancyDE[de] <<std::endl;
+                          std::cout << "Nbins is now: " << NbinsDE[de] <<std::endl;
+                      }
+                  }
+              }
+          }
+          for(int i=0; i<1100; i++){
+              if(NbinsDE[i]>0){
+                  MeanOccupancyDE[i] /= NbinsDE[i];
+              }
+              h1->SetBinContent(i+1, MeanOccupancyDE[i]);
+          }
+          h1->Write();
+          std::cout << "MeanOccupancy of DE819 is: " << MeanOccupancyDE[819] << std::endl;
+      }
+    }
+    
+    {
+        // Using NHitsElec and Norbits to get the mean occupancy per DE on last cycle
+      auto hhits = mHistogramNHitsElec;
+      auto horbits = mHistogramNorbitsElec;
+      auto h1 = mMeanOccupancyPerDECycle;
+      if (hhits && horbits && h1) {
+          for(int de = 0; de < 1100; de++) {
+              NewMeanNhitsDE[de] = 0;
+              NewMeanNorbitsDE[de] = 0;
+          }
+          std::cout << "On va entrer dans la boucle pour lire Elec" << std::endl;
+          for(int binx=1; binx<hhits->GetXaxis()->GetNbins()+1; binx++){
+              for(int biny=1; biny<hhits->GetYaxis()->GetNbins()+1; biny++){
+                  uint32_t ds_addr =  (binx%40)-1;
+                  uint32_t linkid = ( (binx-1-ds_addr) / 40 ) % 12;
+                  uint32_t fee_id = (binx-1-ds_addr-40*linkid) / (12*40);
+                  uint32_t chan_addr = biny-1;
+                  uint32_t de;
+                  uint32_t dsid;
+                  int32_t link_id = mDecoder.getMapCRU(fee_id, linkid);
+               //   std::cout << " linkid " << linkid << " link_id " << link_id << " fee_id " << fee_id << std::endl;
+                  if(link_id > -1){
+                      int32_t result = mDecoder.getMapFEC(link_id, ds_addr, de, dsid);
+                      std::cout << "ds_addr " << ds_addr << " link_id " << link_id << " dsid " << dsid << " de " << de << std::endl;
+                      if(result > -1){
+                          std::cout << "DE seen: " << de << "  Bin content hits: " << hhits->GetBinContent(binx, biny) <<std::endl;
+                          std::cout << "DE seen: " << de << "  Bin content orbits: " << horbits->GetBinContent(binx, biny) <<std::endl;
+                          NewMeanNhitsDE[de] += hhits->GetBinContent(binx, biny);
+                          NewMeanNorbitsDE[de] += horbits->GetBinContent(binx, biny);
+                          NbinsDE[de] += 1;
+                          std::cout << "Sum Nhits is now: " << NewMeanNhitsDE[de] <<std::endl;
+                          std::cout << "Sum Norbits is now: " << NewMeanNorbitsDE[de] <<std::endl;
+                          std::cout << "Nbins is now: " << NbinsDE[de] <<std::endl;
+                      }
+                  }
+              }
+          }
+          for(int i=0; i<1100; i++){
+              MeanOccupancyDECycle[i] = 0;
+              if(NbinsDE[i]>0){
+                  NewMeanNhitsDE[i] /= NbinsDE[i];
+                  NewMeanNorbitsDE[i] /= NbinsDE[i];
+              }
+              if((NewMeanNorbitsDE[i]-LastMeanNorbitsDE[i]) > 0){
+                  MeanOccupancyDECycle[i] = (NewMeanNhitsDE[i]-LastMeanNhitsDE[i])/(NewMeanNorbitsDE[i]-LastMeanNorbitsDE[i]);
+              }
+              h1->SetBinContent(i+1, MeanOccupancyDECycle[i]);
+              LastMeanNhitsDE[i] = NewMeanNhitsDE[i];
+              LastMeanNorbitsDE[i] = NewMeanNorbitsDE[i];
+          }
+          h1->Write();
+          std::cout << "MeanOccupancy of DE819 in last cycle is: " << MeanOccupancyDECycle[819] << std::endl;
+      }
+    }
+    
+    mHistogramOrbits[0]->Write();
+    mHistogramOrbits[1]->Write();
     mHistogramOccupancy[0]->Write();
     mHistogramOccupancy[1]->Write();
     mHistogramOccupancy[2]->Write();

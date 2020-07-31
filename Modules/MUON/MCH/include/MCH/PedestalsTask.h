@@ -75,6 +75,9 @@ class PedestalsTask final : public TaskInterface
 
   void fill_noise_distributions();
   void save_histograms();
+    
+    // File with the electronic mapping information of noisy channels (to be used for DCS)
+    std::string noisyfilename;
 };
 
 } // namespace o2

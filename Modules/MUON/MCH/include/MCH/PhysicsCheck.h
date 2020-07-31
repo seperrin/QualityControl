@@ -9,12 +9,12 @@
 // or submit itself to any jurisdiction.
 
 ///
-/// \file   PedestalsCheck.h
-/// \author Andrea Ferrero
+/// \file   PhysicsCheck.h
+/// \author Andrea Ferrero, Sebastien Perrin
 ///
 
-#ifndef QC_MODULE_MCH_PEDESTALSCHECK_H
-#define QC_MODULE_MCH_PEDESTALSCHECK_H
+#ifndef QC_MODULE_MCH_PHYSICSCHECK_H
+#define QC_MODULE_MCH_PHYSICSCHECK_H
 
 #include "QualityControl/CheckInterface.h"
 #include "QualityControl/MonitorObject.h"
@@ -27,13 +27,13 @@ namespace o2::quality_control_modules::muonchambers
 /// \brief  Check whether a plot is empty or not.
 ///
 /// \author Barthelemy von Haller
-class PedestalsCheck : public o2::quality_control::checker::CheckInterface
+class PhysicsCheck : public o2::quality_control::checker::CheckInterface
 {
  public:
   /// Default constructor
-  PedestalsCheck();
+  PhysicsCheck();
   /// Destructor
-  ~PedestalsCheck() override;
+  ~PhysicsCheck() override;
 
   // Override interface
   void configure(std::string name) override;
@@ -41,23 +41,15 @@ class PedestalsCheck : public o2::quality_control::checker::CheckInterface
   void beautify(std::shared_ptr<MonitorObject> mo, Quality checkResult = Quality::Null) override;
   std::string getAcceptedType() override;
 
-  /// Minimum value for SAMPA pedestals
-  float minMCHpedestal;
-  /// Maximum value for SAMPA pedestals
-  float maxMCHpedestal;
 
  private:
-  /// Vector filled with DualSampas Ids that have been tested but sent back no data
-  std::vector<int> missing;
-    
     int mPrintLevel;
-    
-    // File with the electronic mapping information of noisy channels (to be used for DCS)
-    std::string noisyfilename;
-
-  ClassDefOverride(PedestalsCheck, 1);
+    double minOccupancy;
+    double maxOccupancy;
+  ClassDefOverride(PhysicsCheck, 1);
 };
 
 } // namespace o2::quality_control_modules::muonchambers
 
 #endif // QC_MODULE_TOF_TOFCHECKRAWSTIME_H
+

@@ -9,11 +9,11 @@
 // or submit itself to any jurisdiction.
 
 ///
-/// \file    TrendingTask.cxx
-/// \author  Piotr Konopka
+/// \file    MCHPostProcessing.cxx
+/// \author  Piotr Konopka, Sebastien Perrin
 ///
 
-#include "QualityControl/TrendingTask.h"
+#include "MCH/MCHPostProcessing.h"
 #include "QualityControl/QcInfoLogger.h"
 #include "QualityControl/DatabaseInterface.h"
 #include "QualityControl/MonitorObject.h"
@@ -27,13 +27,14 @@
 using namespace o2::quality_control;
 using namespace o2::quality_control::core;
 using namespace o2::quality_control::postprocessing;
+using namespace o2::quality_control_modules::muonchambers;
 
-void TrendingTask::configure(std::string name, o2::configuration::ConfigurationInterface& config)
+void MCHPostProcessing::configure(std::string name, o2::configuration::ConfigurationInterface& config)
 {
   mConfig = TrendingTaskConfig(name, config);
 }
 
-void TrendingTask::initialize(Trigger, framework::ServiceRegistry& services)
+void MCHPostProcessing::initialize(quality_control::postprocessing::Trigger, o2::framework::ServiceRegistry& services)
 {
   // Preparing data structure of TTree
   mTrend = std::make_unique<TTree>(); // todo: retrieve last TTree, so we continue trending. maybe do it optionally?
@@ -52,7 +53,7 @@ void TrendingTask::initialize(Trigger, framework::ServiceRegistry& services)
 }
 
 //todo: see if OptimizeBaskets() indeed helps after some time
-void TrendingTask::update(Trigger, framework::ServiceRegistry&)
+void MCHPostProcessing::update(quality_control::postprocessing::Trigger, o2::framework::ServiceRegistry&)
 {
   trendValues();
 
@@ -60,13 +61,13 @@ void TrendingTask::update(Trigger, framework::ServiceRegistry&)
   storeTrend();
 }
 
-void TrendingTask::finalize(Trigger, framework::ServiceRegistry&)
+void MCHPostProcessing::finalize(quality_control::postprocessing::Trigger, o2::framework::ServiceRegistry&)
 {
   storePlots();
   storeTrend();
 }
 
-void TrendingTask::storeTrend()
+void MCHPostProcessing::storeTrend()
 {
   ILOG(Info) << "Storing the trend, entries: " << mTrend->GetEntries() << ENDM;
 
@@ -75,7 +76,7 @@ void TrendingTask::storeTrend()
   mDatabase->storeMO(mo);
 }
 
-void TrendingTask::trendValues()
+void MCHPostProcessing::trendValues()
 {
   // We use current date and time. This for planned processing (not history). We still might need to use the objects
   // timestamps in the end, but this would become ambiguous if there is more than one data source.
@@ -106,7 +107,7 @@ void TrendingTask::trendValues()
   mTrend->Fill();
 }
 
-void TrendingTask::storePlots()
+void MCHPostProcessing::storePlots()
 {
   ILOG(Info) << "Generating and storing " << mConfig.plots.size() << " plots." << ENDM;
 
@@ -162,3 +163,4 @@ void TrendingTask::storePlots()
     delete c;
   }
 }
+

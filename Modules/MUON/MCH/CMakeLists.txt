@@ -11,6 +11,11 @@ set(SRCS
   src/PhysicsTaskDigits.cxx
   src/PhysicsTaskPreClusters.cxx
   src/PedestalsCheck.cxx
+  src/PhysicsCheck.cxx
+  src/MCHPostProcessing.cxx
+  src/TH1MCHReductor.cxx
+  src/TH2MCHReductor.cxx
+  src/GlobalHistogramReductor.cxx
 )
 
 set(HEADERS
@@ -22,6 +27,11 @@ set(HEADERS
   include/MCH/PhysicsTaskDigits.h
   include/MCH/PhysicsTaskPreClusters.h
   include/MCH/PedestalsCheck.h
+  include/MCH/PhysicsCheck.h
+  include/MCH/MCHPostProcessing.h
+  include/MCH/TH1MCHReductor.h
+  include/MCH/TH2MCHReductor.h
+  include/MCH/GlobalHistogramReductor.h
 )
 
 # ---- Library ----
@@ -57,7 +67,12 @@ add_root_dictionary(${MODULE_NAME}
                             include/MCH/PhysicsTaskDigits.h
                             include/MCH/PhysicsTaskPreClusters.h
                             include/MCH/PedestalsCheck.h
+                            include/MCH/PhysicsCheck.h
                             include/MCH/sampa_header.h
+                            include/MCH/MCHPostProcessing.h
+                            include/MCH/TH1MCHReductor.h
+                            include/MCH/TH2MCHReductor.h
+                            include/MCH/GlobalHistogramReductor.h
                     LINKDEF include/MCH/LinkDef.h)
 
 # ---- Tests ----

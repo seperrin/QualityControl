@@ -119,6 +119,7 @@ add_root_dictionary(QualityControl
                             include/QualityControl/TrendingTask.h
                             include/QualityControl/Reductor.h
                             include/QualityControl/MonitorObjectCollection.h
+                            include/QualityControl/RootClassFactory.h
                     LINKDEF include/QualityControl/LinkDef.h
                     BASENAME QualityControl)
 

@@ -9,6 +9,7 @@
 #define QC_MODULE_MUONCHAMBERS_PHYSICSTASK_H
 
 #include <TRandom3.h>
+#include <vector>
 
 #include "QualityControl/TaskInterface.h"
 #include "MCH/Mapping.h"
@@ -64,17 +65,45 @@ class PhysicsTask /*final*/ : public TaskInterface // todo add back the "final" 
   int count;
   Decoder mDecoder;
   uint64_t nhits[24][40][64];
+  uint32_t norbits[24];
+  uint32_t firstorbitseen[24];
+    // Tailles des DE
+  double xsizeDE[1100];
+  double ysizeDE[1100];
+    // Valeur de l'occupation moyenne sur chaque DE
+    double MeanOccupancyDE[1100];
+    // Valeur de l'occupation moyenne sur chaque DE sur le cycle écoulé, donc aussi arrays tampons pour faire le calcul (hits, orbits)
+    double MeanOccupancyDECycle[1100];
+    double LastMeanNhitsDE[1100];
+    double LastMeanNorbitsDE[1100];
+    double NewMeanNhitsDE[1100];
+    double NewMeanNorbitsDE[1100];
+    
+    int NbinsDE[1100];
 
   std::vector<std::unique_ptr<mch::Digit>> digits;
   mch::Digit* digitsBuffer;
   int nDigits;
+    
+    // Histogrammes 2D de hits, orbits, occupation en mapping electronique
+  TH2F* mHistogramNHitsElec;
+  TH2F* mHistogramNorbitsElec;
+  TH2F* mHistogramOccupancyElec;
 
-  TH2F* mHistogramNhits[72];
-  TH1F* mHistogramADCamplitude[72];
+    // TH1 de l'occupation moyenne par DE (intégré ou sur le cycle écoulé)
+    TH1F* mMeanOccupancyPerDE;
+    TH1F* mMeanOccupancyPerDECycle;
+
+  TH2F* mHistogramNhits[1100];
+  TH1F* mHistogramADCamplitude[1100];
   std::vector<int> DEs;
   std::map<int, TH1F*> mHistogramADCamplitudeDE;
   std::map<int, TH2F*> mHistogramNhitsDE;
+  std::map<int, TH2F*> mHistogramNorbitsDE;
   std::map<int, TH2F*> mHistogramNhitsHighAmplDE;
+    
+//  std::map<int, TH2F*> mHistogramMeanNhitsPerDE;
+//  std::map<int, TH2F*> mHistogramMeanNorbitsPerDE;
 
   std::map<int, TH1F*> mHistogramClchgDE;
   std::map<int, TH1F*> mHistogramClsizeDE;
@@ -86,6 +115,10 @@ class PhysicsTask /*final*/ : public TaskInterface // todo add back the "final" 
 
   GlobalHistogram* mHistogramPseudoeff[3];
   GlobalHistogram* mHistogramOccupancy[1];
+  GlobalHistogram* mHistogramOrbits[1];
+    
+//  GlobalHistogram* mHistogramMeanOccupancyPerDE[1];
+//  GlobalHistogram* mHistogramMeanOrbitsPerDE[1];
 
   int mPrintLevel;
 };
