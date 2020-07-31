@@ -94,8 +94,8 @@ class PhysicsTask /*final*/ : public TaskInterface // todo add back the "final" 
     TH1F* mMeanOccupancyPerDE;
     TH1F* mMeanOccupancyPerDECycle;
 
-  TH2F* mHistogramNhits[72];
-  TH1F* mHistogramADCamplitude[72];
+  TH2F* mHistogramNhits[1100];
+  TH1F* mHistogramADCamplitude[1100];
   std::vector<int> DEs;
   std::map<int, TH1F*> mHistogramADCamplitudeDE;
   std::map<int, TH2F*> mHistogramNhitsDE;

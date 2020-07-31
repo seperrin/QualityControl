@@ -76,13 +76,13 @@ void PhysicsTask::initialize(o2::framework::InitContext& /*ctx*/)
 
   mDecoder.initialize();
 
-  mPrintLevel = 2;
+  mPrintLevel = 1;
 
   flog = stdout; //fopen("/root/qc.log", "w");
   fprintf(stdout, "PhysicsTask initialization finished\n");
 
   uint32_t dsid;
-  for (int cruid = 0; cruid < 3; cruid++) {
+  for (int cruid = 0; cruid < 32; cruid++) {
       if (mPrintLevel >= 1) {
           QcInfoLogger::GetInstance() << "CRUID " << cruid << AliceO2::InfoLogger::InfoLogger::endm;
       }
@@ -352,9 +352,9 @@ void PhysicsTask::monitorDataDigits(o2::framework::ProcessingContext& ctx)
   }
     
     for (auto& orb : orbits){ //Normalement une seule fois
-        int orbitnumber = (orb << 32) >> 32;
-        int link = (orb << 24) >> 56;
-        int fee = orb >> 40;
+        uint32_t orbitnumber = (orb & 0xFFFFFFFF);
+        uint32_t link = (orb >> 32) & 0xFF;
+        uint32_t fee = (orb >> 40) & 0xFF;
         if (mPrintLevel >= 0) {
             std::cout << fmt::format(" ORB {} ORBITNUMBER {} LINK {} FEE {}\n", orb, orbitnumber, link, fee);
         }
@@ -372,7 +372,7 @@ void PhysicsTask::monitorDataDigits(o2::framework::ProcessingContext& ctx)
         
     for (auto& d : digits) {
     
-        if (mPrintLevel >= 0) {
+        if (mPrintLevel >= 1) {
           std::cout << fmt::format("  DE {:4d}  PAD {:5d}  ADC {:6d}  TIME ({} {} {:4d})",
               d.getDetID(), d.getPadID(), d.getADC(), d.getTime().orbit, d.getTime().bunchCrossing, d.getTime().sampaTime);
           std::cout << std::endl;
@@ -485,6 +485,7 @@ void PhysicsTask::plotDigit(const o2::mch::Digit& digit)
     uint32_t ds_addr = 0;
     int32_t cruid = 0;
     int32_t linkid = 0;
+    int32_t fee_id = 0;
     
     link_id = mDecoder.getMapFECinv(de, dsid, link_id, ds_addr);
       
@@ -493,13 +494,15 @@ void PhysicsTask::plotDigit(const o2::mch::Digit& digit)
       }
       
       if(mDecoder.getMapCRUInv(link_id, cruid, linkid)){
+        fee_id = cruid * 2 + (linkid / 12);
           if (mPrintLevel >= 1) {
           std::cout << "cruid " << cruid << std::endl;
           std::cout << "linkid " << linkid << std::endl;
+          std::cout << "fee_id " << fee_id << std::endl;
           }
       }
       
-      int xbin = cruid * 12 * 40 + (linkid % 12) * 40 + ds_addr + 1;
+      int xbin = fee_id * 12 * 40 + (linkid % 12) * 40 + ds_addr + 1;
       int ybin = chan_addr + 1;
       
       if (mPrintLevel >= 1) {
@@ -566,6 +569,7 @@ void PhysicsTask::plotDigit(const o2::mch::Digit& digit)
                    uint32_t ds_addr_boucle = 0;
                    int32_t cruid_boucle = 0;
                    int32_t linkid_boucle = 0;
+                   int32_t fee_id_boucle = 0;
                    
                    if(segment.findPadPairByPosition(x, y, bpad, nbpad)){
                      //  std::cout << "Pad position x : " << x << " y : " << y << " has bpad : " << bpad << std::endl;
@@ -574,24 +578,24 @@ void PhysicsTask::plotDigit(const o2::mch::Digit& digit)
                        link_id_boucle = mDecoder.getMapFECinv(de, dsid_boucle, link_id_boucle, ds_addr_boucle);
                       // std::cout << "link_id_boucle = " << link_id_boucle << std::endl;
                        if(link_id_boucle == link_id){
-                      //     std::cout << "Setting bin DE with norbits[" << linkid << "]" << " = " << norbits[linkid] << std::endl;
-                           h2->second->SetBinContent(bx, by, norbits[linkid]);
-                           if(!mDecoder.getMapCRUInv(link_id_boucle, cruid_boucle, linkid_boucle)){
-                               std::cout << "Problem getMapCRUInv !!!!!!!!!!!!!" << std::endl;
-                           }
-                           if(mDecoder.getMapCRUInv(link_id_boucle, cruid_boucle, linkid_boucle)){
-                                
-                                int xbin = cruid_boucle * 12 * 40 + (linkid_boucle % 12) * 40 + ds_addr_boucle + 1;
-                                int ybin = chan_addr_boucle + 1;
-//                               int binxy_boucle = mHistogramNorbitsElec->GetBin(xbin, ybin, 1);
-//                               int x_center_boucle = mHistogramNorbitsElec->GetXaxis()->GetBinCenter(xbin);
-//                               int y_center_boucle = mHistogramNorbitsElec->GetXaxis()->GetBinCenter(ybin);
-                        //       std::cout << "Setting bin Elec with norbits[" << linkid << "]" << " = " << norbits[linkid] << std::endl;
-                               mHistogramNorbitsElec->SetBinContent(xbin, ybin, norbits[linkid]);
-                           }
+                         //     std::cout << "Setting bin DE with norbits[" << linkid << "]" << " = " << norbits[linkid] << std::endl;
+                         h2->second->SetBinContent(bx, by, norbits[linkid]);
+                         if(!mDecoder.getMapCRUInv(link_id_boucle, cruid_boucle, linkid_boucle)){
+                           std::cout << "Problem getMapCRUInv !!!!!!!!!!!!!" << std::endl;
+                         }
+                         if(mDecoder.getMapCRUInv(link_id_boucle, cruid_boucle, linkid_boucle)){
+                           fee_id_boucle = cruid_boucle * 2 + (linkid_boucle / 12);
+                           int xbin = fee_id_boucle * 12 * 40 + (linkid_boucle % 12) * 40 + ds_addr_boucle + 1;
+                           int ybin = chan_addr_boucle + 1;
+                           //                               int binxy_boucle = mHistogramNorbitsElec->GetBin(xbin, ybin, 1);
+                           //                               int x_center_boucle = mHistogramNorbitsElec->GetXaxis()->GetBinCenter(xbin);
+                           //                               int y_center_boucle = mHistogramNorbitsElec->GetXaxis()->GetBinCenter(ybin);
+                           //       std::cout << "Setting bin Elec with norbits[" << linkid << "]" << " = " << norbits[linkid] << std::endl;
+                           mHistogramNorbitsElec->SetBinContent(xbin, ybin, norbits[linkid]);
+                         }
                        }
                    }
-                      
+
                }
              }
                if (mPrintLevel >= 1) {
@@ -1106,14 +1110,16 @@ void PhysicsTask::endOfCycle()
           std::cout << "On va entrer dans la boucle pour lire Elec" << std::endl;
           for(int binx=1; binx<h->GetXaxis()->GetNbins()+1; binx++){
               for(int biny=1; biny<h->GetYaxis()->GetNbins()+1; biny++){
-                  uint32_t ds_addr =  (binx%40)-1;
+                  uint32_t ds_addr =  (binx-1) % 40;
                   uint32_t linkid = ( (binx-1-ds_addr) / 40 ) % 12;
                   uint32_t fee_id = (binx-1-ds_addr-40*linkid) / (12*40);
                   uint32_t chan_addr = biny-1;
                   uint32_t de;
                   uint32_t dsid;
-                  int32_t link_id = mDecoder.getMapCRU(fee_id, linkid);
-               //   std::cout << " linkid " << linkid << " link_id " << link_id << " fee_id " << fee_id << std::endl;
+                  uint32_t cru_id = fee_id / 2;
+                  uint32_t crulinkid = linkid + 12 * (fee_id % 2);
+                  int32_t link_id = mDecoder.getMapCRU(cru_id, crulinkid);
+                  //std::cout << " linkid " << linkid << " link_id " << link_id << " fee_id " << fee_id << " ds_addr " << ds_addr << std::endl;
                   if(link_id > -1){
                       int32_t result = mDecoder.getMapFEC(link_id, ds_addr, de, dsid);
                       std::cout << "ds_addr " << ds_addr << " link_id " << link_id << " dsid " << dsid << " de " << de << std::endl;
@@ -1151,14 +1157,16 @@ void PhysicsTask::endOfCycle()
           std::cout << "On va entrer dans la boucle pour lire Elec" << std::endl;
           for(int binx=1; binx<hhits->GetXaxis()->GetNbins()+1; binx++){
               for(int biny=1; biny<hhits->GetYaxis()->GetNbins()+1; biny++){
-                  uint32_t ds_addr =  (binx%40)-1;
+                  uint32_t ds_addr =  (binx-1) % 40;
                   uint32_t linkid = ( (binx-1-ds_addr) / 40 ) % 12;
                   uint32_t fee_id = (binx-1-ds_addr-40*linkid) / (12*40);
                   uint32_t chan_addr = biny-1;
                   uint32_t de;
                   uint32_t dsid;
-                  int32_t link_id = mDecoder.getMapCRU(fee_id, linkid);
-               //   std::cout << " linkid " << linkid << " link_id " << link_id << " fee_id " << fee_id << std::endl;
+                  uint32_t cru_id = fee_id / 2;
+                  uint32_t crulinkid = linkid + 12 * (fee_id % 2);
+                  int32_t link_id = mDecoder.getMapCRU(cru_id, crulinkid);
+                  //std::cout << " linkid " << linkid << " link_id " << link_id << " fee_id " << fee_id << std::endl;
                   if(link_id > -1){
                       int32_t result = mDecoder.getMapFEC(link_id, ds_addr, de, dsid);
                       std::cout << "ds_addr " << ds_addr << " link_id " << link_id << " dsid " << dsid << " de " << de << std::endl;
