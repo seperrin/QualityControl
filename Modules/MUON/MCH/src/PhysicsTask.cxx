@@ -73,7 +73,7 @@ void PhysicsTask::initialize(o2::framework::InitContext& /*ctx*/)
 
   mDecoder.initialize();
 
-  mPrintLevel = 0;
+  mPrintLevel = 1;
 
   flog = stdout; //fopen("/root/qc.log", "w");
   fprintf(stdout, "PhysicsTask initialization finished\n");
@@ -287,7 +287,7 @@ void PhysicsTask::monitorDataDigits(o2::framework::ProcessingContext& ctx)
   }
 
   for (auto& d : digits) {
-    if (mPrintLevel >= 0) {
+    if (mPrintLevel >= 1) {
       std::cout << fmt::format("  DE {:4d}  PAD {:5d}  ADC {:6d}  TIME ({} {} {:4d})",
           d.getDetID(), d.getPadID(), d.getADC(), d.getTime().orbit, d.getTime().bunchCrossing, d.getTime().sampaTime);
       std::cout << std::endl;
@@ -328,64 +328,6 @@ void PhysicsTask::monitorDataPreclusters(o2::framework::ProcessingContext& ctx)
 
 void PhysicsTask::monitorData(o2::framework::ProcessingContext& ctx)
 {
-#ifdef QC_MCH_SAVE_TEMP_ROOTFILE_
-  if ((count % 100) == 0) {
-
-    TFile f("/tmp/qc.root", "RECREATE");
-    for (int i = 0; i < 3 * 24; i++) {
-      //mHistogramNhits[i]->Write();
-      //mHistogramADCamplitude[i]->Write();
-    }
-    //std::cout<<"mHistogramADCamplitudeDE.size() = "<<mHistogramADCamplitudeDE.size()<<"  DEs.size()="<<DEs.size()<<std::endl;
-    int nbDEs = DEs.size();
-    for (int elem = 0; elem < nbDEs; elem++) {
-      int de = DEs[elem];
-      //std::cout<<"  de="<<de<<std::endl;
-      {
-        auto h = mHistogramADCamplitudeDE.find(de);
-        if ((h != mHistogramADCamplitudeDE.end()) && (h->second != NULL)) {
-          h->second->Write();
-        }
-      }
-      {
-        auto h = mHistogramNhitsDE.find(de);
-        if ((h != mHistogramNhitsDE.end()) && (h->second != NULL)) {
-          h->second->Write();
-        }
-      }
-      {
-        auto h = mHistogramNhitsHighAmplDE.find(de);
-        if ((h != mHistogramNhitsHighAmplDE.end()) && (h->second != NULL)) {
-          h->second->Write();
-        }
-      }
-    }
-    {
-      for(int i = 0; i < 4; i++) {
-        for(auto& h2 : mHistogramPreclustersXY[i]) {
-          if (h2.second != nullptr) {
-            h2.second->Write();
-          }
-        }
-        //auto h2 = mHistogramPreclustersXY[i].find(de);
-        //if ((h2 != mHistogramNhitsDE.end()) && (h2->second != NULL)) {
-        //  h2->second->Write();
-        //}
-      }
-    }
-
-    f.ls();
-    f.Close();
-    if (mPrintLevel == 0) {
-      printf("count: %d\n", count);
-    }
-  }
-  if (mPrintLevel >= 1) {
-    printf("count: %d\n", count);
-  }
-  count += 1;
-#endif
-
   if (mPrintLevel >= 0) {
     QcInfoLogger::GetInstance() << "PhysicsTask::monitorData" << AliceO2::InfoLogger::InfoLogger::endm;
     fprintf(flog, "\n================\nPhysicsTask::monitorData\n================\n");
