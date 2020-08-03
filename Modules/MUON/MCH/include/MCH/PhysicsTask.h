@@ -21,6 +21,9 @@
 class TH1F;
 class TH2F;
 
+
+#define MCH_FFEID_MAX (31*2 + 1)
+
 using namespace o2::quality_control::core;
 
 namespace o2
@@ -65,8 +68,8 @@ class PhysicsTask /*final*/ : public TaskInterface // todo add back the "final" 
   int count;
   Decoder mDecoder;
   uint64_t nhits[24][40][64];
-  uint32_t norbits[24];
-  uint32_t firstorbitseen[24];
+  uint32_t norbits[MCH_FFEID_MAX+1][12];
+  uint32_t lastorbitseen[MCH_FFEID_MAX+1][12];
     // Tailles des DE
   double xsizeDE[1100];
   double ysizeDE[1100];
