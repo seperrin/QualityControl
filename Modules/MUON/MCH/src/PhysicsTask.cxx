@@ -186,15 +186,15 @@ void PhysicsTask::initialize(o2::framework::InitContext& /*ctx*/)
       (MCH_FFEID_MAX+1)*12*40, 0, (MCH_FFEID_MAX+1)*12*40, 64, 0, 64);
   getObjectsManager()->startPublishing(mHistogramNHitsElec);
 
-  mHistogramOccupancyElec = new TH2F("QcMuonChambers_Occupancy_Elec", "QcMuonChambers - Occupancy",
+  mHistogramOccupancyElec = new TH2F("QcMuonChambers_Occupancy_Elec", "QcMuonChambers - Occupancy (MHz)",
       (MCH_FFEID_MAX+1)*12*40, 0, (MCH_FFEID_MAX+1)*12*40, 64, 0, 64);
   getObjectsManager()->startPublishing(mHistogramOccupancyElec);
 
   // 1D histograms for mean occupancy per DE (integrated or per elapsed cycle)
-  mMeanOccupancyPerDE = new TH1F("QcMuonChambers_MeanOccupancy", "Mean Occupancy of each DE", 1100, -0.5, 1099.5);
+  mMeanOccupancyPerDE = new TH1F("QcMuonChambers_MeanOccupancy", "Mean Occupancy of each DE (MHz)", 1100, -0.5, 1099.5);
   getObjectsManager()->startPublishing(mMeanOccupancyPerDE);
 
-  mMeanOccupancyPerDECycle = new TH1F("QcMuonChambers_MeanOccupancy_OnCycle", "Mean Occupancy of each DE during the cycle", 1100, -0.5, 1099.5);
+  mMeanOccupancyPerDECycle = new TH1F("QcMuonChambers_MeanOccupancy_OnCycle", "Mean Occupancy of each DE during the cycle (MHz)", 1100, -0.5, 1099.5);
   getObjectsManager()->startPublishing(mMeanOccupancyPerDECycle);
 
   for (int de = 0; de < 1030; de++){
@@ -243,7 +243,7 @@ void PhysicsTask::initialize(o2::framework::InitContext& /*ctx*/)
       mHistogramPseudoeffXY[2].insert(make_pair(de, hXY));
 
       hXY = new TH2F(TString::Format("QcMuonChambers_Occupancy_B_XY_%03d", de),
-          TString::Format("QcMuonChambers - Occupancy XY (DE%03d B)", de), Xsize / scale, -Xsize2, Xsize2, Ysize / scale, -Ysize2, Ysize2);
+          TString::Format("QcMuonChambers - Occupancy XY (DE%03d B) (MHz)", de), Xsize / scale, -Xsize2, Xsize2, Ysize / scale, -Ysize2, Ysize2);
       mHistogramOccupancyXY[0].insert(make_pair(de, hXY));
       getObjectsManager()->startPublishing(hXY);
     }
@@ -256,7 +256,7 @@ void PhysicsTask::initialize(o2::framework::InitContext& /*ctx*/)
   mHistogramPseudoeff[2] = new GlobalHistogram("QcMuonChambers_Pseudoeff_BNB", "Pseudo-efficiency - B+NB");
   mHistogramPseudoeff[2]->init();
 
-  mHistogramOccupancy[0] = new GlobalHistogram("QcMuonChambers_Occupancy_den", "Occupancy");
+  mHistogramOccupancy[0] = new GlobalHistogram("QcMuonChambers_Occupancy_den", "Occupancy (MHz)");
   mHistogramOccupancy[0]->init();
 
   //  mHistogramMeanOccupancyPerDE[0] = new GlobalHistogram("QcMuonChambers_MeanOccupancyPerDE_den", "Mean Occupancy per DE");
@@ -358,12 +358,28 @@ void PhysicsTask::monitorDataDigits(o2::framework::ProcessingContext& ctx)
         if (mPrintLevel >= 0) {
             std::cout << fmt::format(" ORB {} ORBITNUMBER {} LINK {} FEE {}\n", orb, orbitnumber, link, fee);
         }
-        if(orbitnumber != lastorbitseen[fee][link]) {
-          norbits[fee][link] += 1;
+        if(link != 15){
+            if(orbitnumber != lastorbitseen[fee][link]) {
+              norbits[fee][link] += 1;
+            }
+            lastorbitseen[fee][link] = orbitnumber;
+            if (mPrintLevel >= 0) {
+                std::cout<< "Number of orbits of Link " << fee << "," << link << " is set to " << norbits[fee][link] <<std::endl;
+            }
         }
-        lastorbitseen[fee][link] = orbitnumber;
-        if (mPrintLevel >= 0) {
-            std::cout<< "Number of orbits of Link " << fee << "," << link << " is set to " << norbits[fee][link] <<std::endl;
+        else if(link == 15){
+            if (mPrintLevel >= 0) {
+                std::cout<< "All links of FEE " << fee << " have been recieved " <<std::endl;
+            }
+            for(int li=0; li<12; li++){
+                if(orbitnumber != lastorbitseen[fee][li]) {
+                  norbits[fee][li] += 1;
+                }
+                lastorbitseen[fee][li] = orbitnumber;
+                if (mPrintLevel >= 0) {
+                    std::cout<< "Number of orbits of Link " << fee << "," << li << " is set to " << norbits[fee][link] <<std::endl;
+                }
+            }
         }
     }
         
@@ -974,6 +990,7 @@ void PhysicsTask::endOfCycle()
   mHistogramOrbits[0]->set(mHistogramNorbitsDE, mHistogramNorbitsDE);
   mHistogramOccupancy[0]->set(mHistogramNhitsDE, mHistogramNhitsDE);
   mHistogramOccupancy[0]->Divide(mHistogramOrbits[0]);
+  mHistogramOccupancy[0]->Scale(1/87.5); // Converting Occupancy from NbHits/NbOrbits to MHz
 
   // Fill norbits values for electronics channels associated to readout pads
   for(int fee_id = 0; fee_id <= MCH_FFEID_MAX; fee_id++) {
@@ -1020,6 +1037,7 @@ void PhysicsTask::endOfCycle()
   mHistogramOccupancyElec->Reset();
   mHistogramOccupancyElec->Add(mHistogramNHitsElec);
   mHistogramOccupancyElec->Divide(mHistogramNorbitsElec);
+  mHistogramOccupancyElec->Scale(1/87.5); // Converting Occupancy from NbHits/NbOrbits to MHz
 
 #ifdef QC_MCH_SAVE_TEMP_ROOTFILE
     TFile f("/tmp/qc.root", "RECREATE");
@@ -1142,6 +1160,7 @@ void PhysicsTask::endOfCycle()
               auto horbits = mHistogramNorbitsDE.find(de);
               if ((hhits != mHistogramNhitsDE.end()) && (horbits != mHistogramNorbitsDE.end()) && (hhits->second != NULL) && (horbits->second != NULL)) {
                   h->second->Divide(hhits->second,horbits->second);
+                  h->second->Scale(1/87.5); // Converting Occupancy from NbHits/NbOrbits to MHz
                   h->second->Write();
           }
         }
@@ -1214,7 +1233,7 @@ void PhysicsTask::endOfCycle()
               NewMeanNhitsDE[de] = 0;
               NewMeanNorbitsDE[de] = 0;
           }
-          //std::cout << "On va entrer dans la boucle pour lire Elec" << std::endl;
+        //  std::cout << "On va entrer dans la boucle pour lire Elec last cycle" << std::endl;
           for(int binx=1; binx<hhits->GetXaxis()->GetNbins()+1; binx++){
               for(int biny=1; biny<hhits->GetYaxis()->GetNbins()+1; biny++){
                   uint32_t ds_addr =  (binx-1) % 40;
@@ -1230,15 +1249,19 @@ void PhysicsTask::endOfCycle()
                   if(solar_id > -1){
                       int32_t result = mDecoder.getMapFEC(solar_id, ds_addr, de, dsid);
                       //std::cout << "ds_addr " << ds_addr << " solar_id " << solar_id << " dsid " << dsid << " de " << de << std::endl;
-                      if(false && result > -1){
-                          std::cout << "DE seen: " << de << "  Bin content hits: " << hhits->GetBinContent(binx, biny) <<std::endl;
-                          std::cout << "DE seen: " << de << "  Bin content orbits: " << horbits->GetBinContent(binx, biny) <<std::endl;
+                      if(result > -1){
+                          if(false && hhits->GetBinContent(binx, biny) > 0){
+                              std::cout << "DE seen: " << de << "  Bin content hits: " << hhits->GetBinContent(binx, biny) <<std::endl;
+                              std::cout << "DE seen: " << de << "  Bin content orbits: " << horbits->GetBinContent(binx, biny) <<std::endl;
+                          }
                           NewMeanNhitsDE[de] += hhits->GetBinContent(binx, biny);
                           NewMeanNorbitsDE[de] += horbits->GetBinContent(binx, biny);
                           NbinsDE[de] += 1;
-                          std::cout << "Sum Nhits is now: " << NewMeanNhitsDE[de] <<std::endl;
-                          std::cout << "Sum Norbits is now: " << NewMeanNorbitsDE[de] <<std::endl;
-                          std::cout << "Nbins is now: " << NbinsDE[de] <<std::endl;
+                          if(false){
+                              std::cout << "Sum Nhits is now: " << NewMeanNhitsDE[de] <<std::endl;
+                              std::cout << "Sum Norbits is now: " << NewMeanNorbitsDE[de] <<std::endl;
+                              std::cout << "Nbins is now: " << NbinsDE[de] <<std::endl;
+                          }
                       }
                   }
               }
@@ -1250,14 +1273,14 @@ void PhysicsTask::endOfCycle()
                   NewMeanNorbitsDE[i] /= NbinsDE[i];
               }
               if((NewMeanNorbitsDE[i]-LastMeanNorbitsDE[i]) > 0){
-                  MeanOccupancyDECycle[i] = (NewMeanNhitsDE[i]-LastMeanNhitsDE[i])/(NewMeanNorbitsDE[i]-LastMeanNorbitsDE[i]);
+                  MeanOccupancyDECycle[i] = (NewMeanNhitsDE[i]-LastMeanNhitsDE[i])/(NewMeanNorbitsDE[i]-LastMeanNorbitsDE[i])/87.5; //Scaling to MHz
               }
               h1->SetBinContent(i+1, MeanOccupancyDECycle[i]);
               LastMeanNhitsDE[i] = NewMeanNhitsDE[i];
               LastMeanNorbitsDE[i] = NewMeanNorbitsDE[i];
           }
           h1->Write();
-          std::cout << "MeanOccupancy of DE819 in last cycle is: " << MeanOccupancyDECycle[819] << std::endl;
+          std::cout << "MeanOccupancy of DE502 in last cycle is: " << MeanOccupancyDECycle[502] << std::endl;
       }
     }
     
