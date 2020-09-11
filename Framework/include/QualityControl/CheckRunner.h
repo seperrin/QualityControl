@@ -38,6 +38,11 @@
 #include "QualityControl/QcInfoLogger.h"
 #include "QualityControl/Check.h"
 
+namespace o2::quality_control::core
+{
+class ServiceDiscovery;
+}
+
 namespace o2::framework
 {
 struct InputSpec;
@@ -79,7 +84,6 @@ class CheckRunner : public framework::Task
    * @param checkNames List of check names, that operate on the same inputs.
    * @param configurationSource Path to configuration
    */
-  CheckRunner(Check check, std::string configurationSource);
   CheckRunner(std::vector<Check> checks, std::string configurationSource);
 
   /**
@@ -106,12 +110,12 @@ class CheckRunner : public framework::Task
   framework::Outputs getOutputs() { return mOutputs; };
 
   void setTaskStoreSet(std::unordered_set<std::string> storeSet) { mInputStoreSet = storeSet; }
+  std::string getDeviceName() { return mDeviceName; };
 
   /// \brief Unified DataDescription naming scheme for all checkers
   static o2::header::DataDescription createCheckRunnerDataDescription(const std::string taskName);
   static o2::framework::Inputs createInputSpec(const std::string checkName, const std::string configSource);
 
-  std::string getDeviceName() { return mDeviceName; };
   static std::string createCheckRunnerIdString() { return "QC-CHECK-RUNNER"; };
   static std::string createCheckRunnerName(std::vector<Check> checks);
   static std::string createSinkCheckRunnerName(o2::framework::InputSpec input);
@@ -127,26 +131,26 @@ class CheckRunner : public framework::Task
    * @param mo The MonitorObject to evaluate and whose quality will be set according
    *        to the worse quality encountered while running the Check's.
    */
-  std::vector<Check*> check(std::map<std::string, std::shared_ptr<MonitorObject>> moMap);
+  QualityObjectsType check(std::map<std::string, std::shared_ptr<MonitorObject>> moMap);
 
   /**
-   * \brief Store the MonitorObject in the database.
+   * \brief Store the QualityObjects in the database.
    *
-   * @param mo The MonitorObject to be stored in the database.
+   * @param qualityObjects QOs to be stored in DB.
    */
-  void store(std::vector<Check*>& checks);
+  void store(QualityObjectsType& qualityObjects);
 
   /**
-   * \brief Send the MonitorObject on FairMQ to whoever is listening.
-   */
-  void send(std::vector<Check*>& checks, framework::DataAllocator& allocator);
-
-  /**
-   * \brief Update cached monitor object with new one.
+   * \brief Store the MonitorObjects in the database.
    *
-   * \param mo The MonitorObject to be updated
+   * @param monitorObjects MOs to be stored in DB.
    */
-  void update(std::shared_ptr<MonitorObject> mo);
+  void store(std::vector<std::shared_ptr<MonitorObject>>& monitorObjects);
+
+  /**
+   * \brief Send the QualityObjects on the DataProcessor output channel.
+   */
+  void send(QualityObjectsType& qualityObjects, framework::DataAllocator& allocator);
 
   /**
    * \brief Collect input specs from Checks
@@ -157,6 +161,7 @@ class CheckRunner : public framework::Task
 
   inline void initDatabase();
   inline void initMonitoring();
+  inline void initServiceDiscovery();
 
   /**
    * \brief Increase the revision number for the Monitor Object.
@@ -168,11 +173,32 @@ class CheckRunner : public framework::Task
   void updateRevision();
 
   /**
+   * Update the list of objects this TaskRunner is sending out.
+   * @param qualityObjects
+   */
+  void updateServiceDiscovery(const QualityObjectsType& qualityObjects);
+
+  /**
    * \brief BSD checksum algorithm.
    *
    * \param input_string String intended to be hashed
    */
   static std::size_t hash(std::string input_string);
+
+  /**
+   * \brief Massage/Prepare data from the Context and store it in the cache.
+   * When data is received it can be 1. a TObjArray filled with MonitorObjects,
+   * 2. a TObjArray filled with TObjects or 3. a TObject. The two latter happen
+   * in case an external device is sending the data.
+   * This method first transform the data in order to have a TObjArray of MonitorObjects.
+   * It then stores these objects in the cache.
+   * @param ctx
+   */
+  void prepareCacheData(framework::InputRecord& inputRecord);
+  /**
+   * Send metrics to the monitoring system if the time has come.
+   */
+  void sendPeriodicMonitoring();
 
   // General state
   std::string mDeviceName;
@@ -192,13 +218,17 @@ class CheckRunner : public framework::Task
   // Checks cache
   std::map<std::string, std::shared_ptr<MonitorObject>> mMonitorObjects;
 
+  // Service discovery
+  std::shared_ptr<ServiceDiscovery> mServiceDiscovery;
+  std::unordered_set<std::string> mListAllQOPaths; // store the names of all the QOs the Checks have generated so far
+
   // monitoring
   std::shared_ptr<o2::monitoring::Monitoring> mCollector;
   int mTotalNumberObjectsReceived;
   int mTotalNumberCheckExecuted;
   int mTotalNumberQOStored;
   int mTotalNumberMOStored;
-  AliceO2::Common::Timer timer;
+  AliceO2::Common::Timer mTimer;
 };
 
 } // namespace o2::quality_control::checker

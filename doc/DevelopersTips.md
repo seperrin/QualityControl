@@ -10,6 +10,17 @@ here. It is not sanitized or organized. Just a brain dump.
 4. A PR is automatically created in alidist
 5. Once merged, send an email to alice-o2-wp7@cern.ch, alice-o2-qc-contact@cern.ch and alice-dpg-qa-tools@cern.ch to announce the new release. Use the email for the previous release as a template.
 
+### Create a fix version
+1. checkout last tagged version, e.g. `git checkout v0.26.1`
+2. branch, e.g. `git checkout -b branch_v0.26.2`
+2. push the branch upstream, e.g. `git push upstream -u branch_v0.26.2`
+2. cherry-pick the commit from master, e.g. `git cherry-pick b187ddbe52058d53a9bbf3cbdd53121c6b936cd8`
+3. change version in CMakeLists and commit
+5. tag, e.g. `git tag -a v0.26.2 -m "v0.26.2"`
+4. push the tag upstream, e.g. `git push upstream v0.26.2`
+6. Release in github
+4. A PR is automatically created in alidist
+
 ### Where and how to configure the repo_cleaner of the ccdb-test
 
 The config file is stored in git in the branch `repo_cleaner` (careful not to update in master instead !). Check out the branch, update the file Framework/script/RepoCleaner/config.yaml and commit it. A PR is necessary but in case of emergency, force-merge it. As soon as it is merged, it will be used by the script.
@@ -56,6 +67,11 @@ When we don't see the monitoring data in grafana, here is what to do to pinpoint
     4. `show series`
     5. `select count(*) from cpuUsedPercentage` <-- use the correct metrics name
     6. Repeat the last command and see if the number increases. If it increases it denotes that the metrics is stored correctly in the database. If it is the case, the problem lies in your grafana.
+    
+### Monitoring setup for building the grafana dashboard
+
+Ask Adam for an account on pcald03.cern.ch:3000.
+Set the monitoring url to `"url": "influxdb-udp://flptest2.cern.ch:8089"`
 
 ### Avoid writing QC objects to a repository
 
@@ -83,13 +99,16 @@ Related issues : https://alice.its.cern.ch/jira/browse/QC-224
 
 ### Service Discovery (Online mode)
 
-Service discovery (Online mode) is used to list currently published objects by running QC tasks. It uses Consul to store:
+Service discovery (Online mode) is used to list currently published objects by running QC tasks and checkers. It uses Consul to store:
  - List of running QC tasks that respond to health check, known as "services" in Consul
  - List of published object by each QC task ("service"), knows as "tags" of a "service" in Consul
+ - List of published Quality Objects by each CheckRunner. 
 
 Both lists are updated from within QC task using [Service Discovery C++ API](#Service-Discovery-C++-API-and-Consul-HTTP-API):
 - `register` - when a tasks starts
 - `deregister` - when tasks ends
+
+If the "health check" is failing, make sure the ports 7777 (Tasks) and 7778 (CheckRuners) are open.
 
 #### Register (and health check)
 When a QC task starts, it register its presence in Consul by calling [register endpoit of Consul HTTP API](https://www.consul.io/api/agent/service.html#register-service). The request needs the following fields:
@@ -100,3 +119,21 @@ When a QC task starts, it register its presence in Consul by calling [register e
 
 #### Deregister
 In order to deregister a service [`deregister/:Id` endpoint of Consul HTTP API](https://www.consul.io/api/agent/service.html#deregister-service) needs to be called. It does not need any additional parameters.
+
+### QCG and QC integration tests 
+
+What are the QC integration tests in the FLP Pipeline doing?
+
+- They pretend to be one of us when doing a test for an FLP release.
+- Start a QC environment
+- Opening QCG and check existence of certain objects in offline & online mode and that when you click on them they open a plot
+- Stop/Destroy that env
+
+Those object names are configurable from Ansible so that we do not have to release a new QCG rpm if we need to update the objects we check. So, if you know something will change 
+modify the following file: https://gitlab.cern.ch/AliceO2Group/system-configuration/-/blob/dev/ansible/roles/flp-deployment-checks/templates/qcg-test-config.js.j2
+
+### Check the logs of the QCG
+
+```
+journalctl -u o2-qcg
+```

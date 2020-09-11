@@ -31,16 +31,21 @@
 #include <chrono>
 #include <sstream>
 #include <unordered_set>
-
+// boost
 #include <boost/algorithm/string.hpp>
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/foreach.hpp>
+// misc
+#include "rapidjson/document.h"
+#include "rapidjson/stringbuffer.h"
+#include "rapidjson/writer.h"
 
 using namespace std::chrono;
 using namespace AliceO2::Common;
 using namespace o2::quality_control::core;
 using namespace std;
+using namespace rapidjson;
 
 namespace o2::quality_control::repository
 {
@@ -102,7 +107,7 @@ void CcdbDatabase::init()
 }
 
 // Monitor object
-void CcdbDatabase::storeMO(std::shared_ptr<o2::quality_control::core::MonitorObject> mo)
+void CcdbDatabase::storeMO(std::shared_ptr<o2::quality_control::core::MonitorObject> mo, long from, long to)
 {
   if (mo->getName().length() == 0 || mo->getTaskName().length() == 0) {
     BOOST_THROW_EXCEPTION(DatabaseException()
@@ -126,8 +131,12 @@ void CcdbDatabase::storeMO(std::shared_ptr<o2::quality_control::core::MonitorObj
 
   // other attributes
   string path = mo->getPath();
-  long from = getCurrentTimestamp();
-  long to = getFutureTimestamp(60 * 60 * 24 * 365 * 10);
+  if (from == -1) {
+    from = getCurrentTimestamp();
+  }
+  if (to == -1) {
+    to = from + 1000l * 60 * 60 * 24 * 365 * 10; // ~10 years since the start of validity
+  }
 
   // extract object and metadata from MonitorObject
   TObject* obj = mo->getObject();
@@ -135,10 +144,11 @@ void CcdbDatabase::storeMO(std::shared_ptr<o2::quality_control::core::MonitorObj
   metadata["qc_task_name"] = mo->getTaskName();
   metadata["ObjectType"] = mo->getObject()->IsA()->GetName(); // ObjectType says TObject and not MonitorObject due to a quirk in the API. Once fixed, remove this.
 
+  ILOG(Debug) << "Storing MonitorObject " << path << ENDM;
   ccdbApi.storeAsTFileAny<TObject>(obj, path, metadata, from, to);
 }
 
-void CcdbDatabase::storeQO(std::shared_ptr<QualityObject> qo)
+void CcdbDatabase::storeQO(std::shared_ptr<o2::quality_control::core::QualityObject> qo, long from, long to)
 {
   // metadata
   map<string, string> metadata;
@@ -155,9 +165,14 @@ void CcdbDatabase::storeQO(std::shared_ptr<QualityObject> qo)
 
   // other attributes
   string path = qo->getPath();
-  long from = getCurrentTimestamp();
-  long to = getFutureTimestamp(60 * 60 * 24 * 365 * 10);
+  if (from == -1) {
+    from = getCurrentTimestamp();
+  }
+  if (to == -1) {
+    to = from + 1000l * 60 * 60 * 24 * 365 * 10; // ~10 years since the start of validity
+  }
 
+  ILOG(Debug) << "Storing object " << path << ENDM;
   ccdbApi.storeAsTFileAny<QualityObject>(qo.get(), path, metadata, from, to);
 }
 
@@ -173,7 +188,7 @@ TObject* CcdbDatabase::retrieveTObject(std::string path, std::map<std::string, s
       return nullptr;
     }
   }
-  ILOG(Debug) << "Retrieved object " << path << ENDM;
+  ILOG(Debug) << "Retrieved object " << path << " with timestamp " << timestamp << ENDM;
   return object;
 }
 
@@ -222,9 +237,10 @@ std::shared_ptr<QualityObject> CcdbDatabase::retrieveQO(std::string qoPath, long
   std::shared_ptr<QualityObject> qo(dynamic_cast<QualityObject*>(obj));
   if (qo == nullptr) {
     ILOG(Error) << "Could not cast the object " << qoPath << " to QualityObject" << ENDM;
+  } else {
+    // TODO should we remove the headers we know are general such as ETag and qc_task_name ?
+    qo->addMetadata(headers);
   }
-  // TODO should we remove the headers we know are general such as ETag and qc_task_name ?
-  qo->addMetadata(headers);
   return qo;
 }
 
@@ -244,12 +260,15 @@ std::string CcdbDatabase::retrieveMOJson(std::string taskName, std::string objec
 std::string CcdbDatabase::retrieveJson(std::string path, long timestamp, const std::map<std::string, std::string>& metadata)
 {
   map<string, string> headers;
-  auto tobj = retrieveTObject(path, metadata, timestamp, &headers);
+  Document jsonDocument;
 
+  // Get object
+  auto* tobj = retrieveTObject(path, metadata, timestamp, &headers);
   if (tobj == nullptr) {
     return std::string();
   }
 
+  // Convert object to JSON string
   TObject* toConvert = nullptr;
   if (tobj->IsA() == MonitorObject::Class()) { // a full MO -> pre-v0.25
     std::shared_ptr<MonitorObject> mo(dynamic_cast<MonitorObject*>(tobj));
@@ -267,7 +286,26 @@ std::string CcdbDatabase::retrieveJson(std::string path, long timestamp, const s
   TString json = TBufferJSON::ConvertToJSON(toConvert);
   delete toConvert;
 
-  return json.Data();
+  // Prepare JSON document and add metadata
+  if (jsonDocument.Parse(json.Data()).HasParseError()) {
+    ILOG(Error) << "Unable to parse the JSON returned by TBufferJSON for object " << path << ENDM;
+    return std::string();
+  }
+  rapidjson::Document::AllocatorType& allocator = jsonDocument.GetAllocator();
+  rapidjson::Value object(rapidjson::Type::kObjectType);
+  for (auto const& [key, value] : headers) {
+    rapidjson::Value k(key.c_str(), allocator);
+    rapidjson::Value v(value.c_str(), allocator);
+    object.AddMember(k, v, allocator);
+  }
+  jsonDocument.AddMember("metadata", object, allocator);
+
+  // Convert to string
+  StringBuffer buffer;
+  buffer.Clear();
+  Writer<rapidjson::StringBuffer> writer(buffer);
+  jsonDocument.Accept(writer);
+  return strdup(buffer.GetString());
 }
 
 void CcdbDatabase::disconnect()

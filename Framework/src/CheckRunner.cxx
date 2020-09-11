@@ -12,6 +12,7 @@
 /// \file   CheckRunner.cxx
 /// \author Barthelemy von Haller
 /// \author Piotr Konopka
+/// \author Rafal Pacholek
 ///
 
 #include "QualityControl/CheckRunner.h"
@@ -31,6 +32,9 @@
 // QC
 #include "QualityControl/DatabaseFactory.h"
 #include "QualityControl/TaskRunner.h"
+#include "QualityControl/ServiceDiscovery.h"
+// Fairlogger
+#include <fairlogger/Logger.h>
 
 using namespace std::chrono;
 using namespace AliceO2::Common;
@@ -40,13 +44,13 @@ using namespace o2::configuration;
 using namespace o2::monitoring;
 using namespace o2::quality_control::core;
 using namespace o2::quality_control::repository;
+using namespace std;
 
 const auto current_diagnostic = boost::current_exception_diagnostic_information;
 
 namespace o2::quality_control::checker
 {
-
-/// Static functions
+// fixme: this is not actually used. collectOutputs() is used instead.
 o2::header::DataDescription CheckRunner::createCheckRunnerDataDescription(const std::string taskName)
 {
   if (taskName.empty()) {
@@ -55,23 +59,6 @@ o2::header::DataDescription CheckRunner::createCheckRunnerDataDescription(const 
   o2::header::DataDescription description;
   description.runtimeInit(std::string(taskName.substr(0, o2::header::DataDescription::size - 4) + "-chk").c_str());
   return description;
-}
-
-o2::framework::Inputs CheckRunner::createInputSpec(const std::string checkName, const std::string configSource)
-{
-  std::unique_ptr<ConfigurationInterface> config = ConfigurationFactory::getConfiguration(configSource);
-  o2::framework::Inputs inputs;
-  for (auto& [key, sourceConf] : config->getRecursive("qc.checks." + checkName + ".dataSource")) {
-    (void)key;
-    if (sourceConf.get<std::string>("type") == "Task") {
-      const std::string& taskName = sourceConf.get<std::string>("name");
-      ILOG(Info) << ">>>> Check name : " << checkName << " input task name: " << taskName << " " << TaskRunner::createTaskDataDescription(taskName).as<std::string>() << ENDM;
-      o2::framework::InputSpec input{ taskName, TaskRunner::createTaskDataOrigin(), TaskRunner::createTaskDataDescription(taskName) };
-      inputs.push_back(std::move(input));
-    }
-  }
-
-  return inputs;
 }
 
 std::size_t CheckRunner::hash(std::string inputString)
@@ -142,11 +129,6 @@ o2::framework::Outputs CheckRunner::collectOutputs(const std::vector<Check>& che
   return outputs;
 }
 
-/// Members
-
-// TODO do we need a CheckFactory ? here it is embedded in the CheckRunner
-// TODO maybe we could use the CheckRunnerFactory
-
 CheckRunner::CheckRunner(std::vector<Check> checks, std::string configurationSource)
   : mDeviceName(createCheckRunnerName(checks)),
     mChecks{ checks },
@@ -167,11 +149,6 @@ CheckRunner::CheckRunner(std::vector<Check> checks, std::string configurationSou
                 << boost::current_exception_diagnostic_information(true) << ENDM;
     throw;
   }
-}
-
-CheckRunner::CheckRunner(Check check, std::string configurationSource)
-  : CheckRunner(std::vector{ check }, configurationSource)
-{
 }
 
 CheckRunner::CheckRunner(InputSpec input, std::string configurationSource)
@@ -197,6 +174,9 @@ CheckRunner::CheckRunner(InputSpec input, std::string configurationSource)
 
 CheckRunner::~CheckRunner()
 {
+  if (mServiceDiscovery != nullptr) {
+    mServiceDiscovery->deregister();
+  }
 }
 
 void CheckRunner::init(framework::InitContext&)
@@ -204,6 +184,7 @@ void CheckRunner::init(framework::InitContext&)
   try {
     initDatabase();
     initMonitoring();
+    initServiceDiscovery();
     for (auto& check : mChecks) {
       check.init();
     }
@@ -217,50 +198,80 @@ void CheckRunner::init(framework::InitContext&)
 
 void CheckRunner::run(framework::ProcessingContext& ctx)
 {
+  prepareCacheData(ctx.inputs());
+
+  auto qualityObjects = check(mMonitorObjects);
+
+  store(qualityObjects);
+  store(mMonitorObjectStoreVector);
+
+  send(qualityObjects, ctx.outputs());
+
+  updateRevision();
+
+  sendPeriodicMonitoring();
+}
+
+void CheckRunner::prepareCacheData(framework::InputRecord& inputRecord)
+{
   mMonitorObjectStoreVector.clear();
 
   for (const auto& input : mInputs) {
-    auto dataRef = ctx.inputs().get(input.binding.c_str());
+    auto dataRef = inputRecord.get(input.binding.c_str());
     if (dataRef.header != nullptr && dataRef.payload != nullptr) {
-      auto moArray = ctx.inputs().get<TObjArray*>(input.binding.c_str());
-      mLogger << "Device " << mDeviceName
-              << " received " << moArray->GetEntries()
-              << " MonitorObjects from " << input.binding
-              << ENDM;
 
-      // Check if this CheckRunner stores this input
-      bool store = mInputStoreSet.count(DataSpecUtils::label(input)) > 0;
+      // We don't know what we receive, so we test for an array and then try a tobject.
+      // If we received a tobject, it gets encapsulated in the tobjarray.
+      shared_ptr<const TObjArray> array = nullptr;
+      shared_ptr<const TObject> tobj = inputRecord.get<TObject*>(input.binding.c_str());
+      // if the object has not been found, it will raise an exception that we just let go.
+      if (tobj->InheritsFrom("TObjArray")) {
+        array = dynamic_pointer_cast<const TObjArray>(tobj);
+        mLogger << AliceO2::InfoLogger::InfoLogger::Info << "CheckRunner " << mDeviceName
+                << " received an array with " << array->GetEntries()
+                << " entries from " << input.binding << ENDM;
+      } else {
+        // it is just a TObject not embedded in a TObjArray. We build a TObjArray for it.
+        auto* newArray = new TObjArray();    // we cannot use `array` to add an object as it is const
+        TObject* newTObject = tobj->Clone(); // we need a copy to avoid that it gets deleted behind our back.
+        newArray->Add(newTObject);
+        array.reset(newArray); // now that the array is ready we can adopt it.
+        mLogger << AliceO2::InfoLogger::InfoLogger::Info << "CheckRunner " << mDeviceName
+                << " received a tobject named " << tobj->GetName()
+                << " from " << input.binding << ENDM;
+      }
 
-      for (const auto& to : *moArray) {
-        std::shared_ptr<MonitorObject> mo{ dynamic_cast<MonitorObject*>(to) };
+      // for each item of the array, check whether it is a MonitorObject. If not, create one and encapsulate.
+      // Then, store the MonitorObject in the various maps and vectors we will use later.
+      bool store = mInputStoreSet.count(DataSpecUtils::label(input)) > 0; // Check if this CheckRunner stores this input
+      for (const auto tObject : *array) {
+        std::shared_ptr<MonitorObject> mo{ dynamic_cast<MonitorObject*>(tObject) };
+
+        if (mo == nullptr) {
+          mLogger << AliceO2::InfoLogger::InfoLogger::Info << "The MO is null, probably a TObject could not be casted into an MO." << ENDM;
+          mLogger << AliceO2::InfoLogger::InfoLogger::Info << "    Creating an ad hoc MO." << ENDM;
+          header::DataOrigin origin = DataSpecUtils::asConcreteOrigin(input);
+          mo = std::make_shared<MonitorObject>(tObject, input.binding, origin.str);
+        }
 
         if (mo) {
-          update(mo);
+          mMonitorObjects[mo->getFullName()] = mo;
+          mMonitorObjectRevision[mo->getFullName()] = mGlobalRevision;
           mTotalNumberObjectsReceived++;
 
-          // Add monitor object to store later, after possible beautification
-          if (store) {
+          if (store) { // Monitor Object will be stored later, after possible beautification
             mMonitorObjectStoreVector.push_back(mo);
           }
-
-        } else {
-          mLogger << "The mo is null" << ENDM;
         }
       }
     }
   }
+}
 
-  // Check if compliant with policy
-  auto triggeredChecks = check(mMonitorObjects);
-  store(triggeredChecks);
-  send(triggeredChecks, ctx.outputs());
-
-  // Update global revision number
-  updateRevision();
-
-  // monitoring
-  if (timer.isTimeout()) {
-    timer.reset(1000000); // 10 s.
+void CheckRunner::sendPeriodicMonitoring()
+{
+  if (mTimer.isTimeout()) {
+    mTimer.reset(1000000); // 10 s.
     mCollector->send({ mTotalNumberObjectsReceived, "qc_objects_received" }, DerivedMetricMode::RATE);
     mCollector->send({ mTotalNumberCheckExecuted, "qc_checks_executed" }, DerivedMetricMode::RATE);
     mCollector->send({ mTotalNumberQOStored, "qc_qo_stored" }, DerivedMetricMode::RATE);
@@ -268,26 +279,19 @@ void CheckRunner::run(framework::ProcessingContext& ctx)
   }
 }
 
-void CheckRunner::update(std::shared_ptr<MonitorObject> mo)
+QualityObjectsType CheckRunner::check(std::map<std::string, std::shared_ptr<MonitorObject>> moMap)
 {
-  mMonitorObjects[mo->getFullName()] = mo;
-  mMonitorObjectRevision[mo->getFullName()] = mGlobalRevision;
-}
-
-std::vector<Check*> CheckRunner::check(std::map<std::string, std::shared_ptr<MonitorObject>> moMap)
-{
-  mLogger << "Running " << mChecks.size() << " checks for " << moMap.size() << " monitor objects"
+  mLogger << "Trying " << mChecks.size() << " checks for " << moMap.size() << " monitor objects"
           << ENDM;
 
-  std::vector<Check*> triggeredChecks;
+  QualityObjectsType allQOs;
   for (auto& check : mChecks) {
     if (check.isReady(mMonitorObjectRevision)) {
-      auto qualityObj = check.check(moMap);
-      mTotalNumberCheckExecuted++;
-      // Check if shared_ptr != nullptr
-      if (qualityObj) {
-        triggeredChecks.push_back(&check);
-      }
+      auto newQOs = check.check(moMap);
+      mTotalNumberCheckExecuted += newQOs.size();
+
+      allQOs.insert(allQOs.end(), std::make_move_iterator(newQOs.begin()), std::make_move_iterator(newQOs.end()));
+      newQOs.clear();
 
       // Was checked, update latest revision
       check.updateRevision(mGlobalRevision);
@@ -295,24 +299,27 @@ std::vector<Check*> CheckRunner::check(std::map<std::string, std::shared_ptr<Mon
       mLogger << "Monitor Objects for the check '" << check.getName() << "' are not ready, ignoring" << ENDM;
     }
   }
-  return triggeredChecks;
+  return allQOs;
 }
 
-void CheckRunner::store(std::vector<Check*>& checks)
+void CheckRunner::store(QualityObjectsType& qualityObjects)
 {
-  mLogger << "Storing " << checks.size() << " quality objects" << ENDM;
+  mLogger << "Storing " << qualityObjects.size() << " QualityObjects" << ENDM;
   try {
-    for (auto check : checks) {
-      mDatabase->storeQO(check->getQualityObject());
+    for (auto& qo : qualityObjects) {
+      mDatabase->storeQO(qo);
       mTotalNumberQOStored++;
     }
   } catch (boost::exception& e) {
     mLogger << "Unable to " << diagnostic_information(e) << ENDM;
   }
+}
 
-  mLogger << "Storing " << mMonitorObjectStoreVector.size() << " monitor objects" << ENDM;
+void CheckRunner::store(std::vector<std::shared_ptr<MonitorObject>>& monitorObjects)
+{
+  mLogger << "Storing " << monitorObjects.size() << " MonitorObjects" << ENDM;
   try {
-    for (auto mo : mMonitorObjectStoreVector) {
+    for (auto& mo : monitorObjects) {
       mDatabase->storeMO(mo);
       mTotalNumberMOStored++;
     }
@@ -321,15 +328,54 @@ void CheckRunner::store(std::vector<Check*>& checks)
   }
 }
 
-void CheckRunner::send(std::vector<Check*>& checks, framework::DataAllocator& allocator)
+void CheckRunner::send(QualityObjectsType& qualityObjects, framework::DataAllocator& allocator)
 {
-  mLogger << "Send  " << checks.size() << " quality objects" << ENDM;
-  for (auto check : checks) {
-    auto outputSpec = check->getOutputSpec();
+  // Note that we might send multiple QOs in one output, as separate parts.
+  // This should be fine if they are retrieved on the other side with InputRecordWalker.
+
+  mLogger << "Sending " << qualityObjects.size() << " quality objects" << ENDM;
+  for (const auto& qo : qualityObjects) {
+
+    const auto& correspondingCheck = std::find_if(mChecks.begin(), mChecks.end(), [checkName = qo->getCheckName()](const auto& check) {
+      return check.getName() == checkName;
+    });
+
+    auto outputSpec = correspondingCheck->getOutputSpec();
     auto concreteOutput = framework::DataSpecUtils::asConcreteDataMatcher(outputSpec);
     allocator.snapshot(
-      framework::Output{ concreteOutput.origin, concreteOutput.description, concreteOutput.subSpec, outputSpec.lifetime }, *check->getQualityObject());
+      framework::Output{ concreteOutput.origin, concreteOutput.description, concreteOutput.subSpec, outputSpec.lifetime }, *qo);
   }
+}
+
+void CheckRunner::updateServiceDiscovery(const QualityObjectsType& qualityObjects)
+{
+  if (mServiceDiscovery == nullptr) {
+    return;
+  }
+
+  // Insert into the list of paths the QOs' paths.
+  // The list of paths cannot be computed during initialization and is therefore updated here.
+  // It cannot be done in the init because of the case when the policy OnEachSeparately is used with a
+  // data source specifying "all" MOs. As a consequence we have to check the QOs we actually receive.
+  // A possible optimization would be to collect the list of QOs for all checks where it is possible (i.e.
+  // all but OnEachSeparately with "All" MOs). If we can get all of them, then no need to update the list
+  // after initialization. Otherwise, we set the list we know in init and then add to it as we go.
+  size_t formerNumberQOsNames = mListAllQOPaths.size();
+  for (const auto& qo : qualityObjects) {
+    mListAllQOPaths.insert(qo->getPath());
+  }
+  // if nothing was inserted, no need to update
+  if (mListAllQOPaths.size() == formerNumberQOsNames) {
+    return;
+  }
+
+  // prepare the string of comma separated objects and publish it
+  std::string objects;
+  for (auto path : mListAllQOPaths) {
+    objects += path + ",";
+  }
+  objects.pop_back(); // remove last comma
+  mServiceDiscovery->_register(objects);
 }
 
 void CheckRunner::updateRevision()
@@ -356,12 +402,20 @@ void CheckRunner::initDatabase()
 
 void CheckRunner::initMonitoring()
 {
-  std::string monitoringUrl = mConfigFile->get<std::string>("qc.config.monitoring.url", "infologger:///debug?qc");
+  auto monitoringUrl = mConfigFile->get<std::string>("qc.config.monitoring.url", "infologger:///debug?qc");
   mCollector = MonitoringFactory::Get(monitoringUrl);
   mCollector->enableProcessMonitoring();
   mCollector->addGlobalTag(tags::Key::Subsystem, tags::Value::QC);
   mCollector->addGlobalTag("CheckRunnerName", mDeviceName);
-  timer.reset(1000000); // 10 s.
+  mTimer.reset(1000000); // 10 s.
+}
+
+void CheckRunner::initServiceDiscovery()
+{
+  auto consulUrl = mConfigFile->get<std::string>("qc.config.consul.url", "http://consul-test.cern.ch:8500");
+  std::string url = ServiceDiscovery::GetDefaultUrl(ServiceDiscovery::DefaultHealthPort + 1); // we try to avoid colliding with the TaskRunner
+  mServiceDiscovery = std::make_shared<ServiceDiscovery>(consulUrl, mDeviceName, mDeviceName, url);
+  LOG(INFO) << "ServiceDiscovery initialized";
 }
 
 } // namespace o2::quality_control::checker

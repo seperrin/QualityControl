@@ -11,18 +11,18 @@
             * [Custom Data Sampling Condition](#custom-data-sampling-condition)
             * [Bypassing the Data Sampling](#bypassing-the-data-sampling)
          * [Code Organization](#code-organization)
+         * [Developing with aliBuild/alienv](#developing-with-alibuildalienv)
          * [User-defined modules](#user-defined-modules)
       * [Module creation](#module-creation)
       * [Test run](#test-run)
-      * [Modification of a Task](#modification-of-a-task)
+      * [Modification of the Task](#modification-of-the-task)
       * [Check](#check)
          * [Configuration](#configuration)
          * [Implementation](#implementation)
       * [Committing code](#committing-code)
       * [Raw data source](#raw-data-source)
 
-<!-- Added by: barth, at: Mer 18 mar 2020 13:34:28 CET -->
-
+<!-- Added by: barth, at: Lun 17 aoû 2020 14:57:50 CEST -->
 <!--te-->
 
 [← Go back to Quickstart](QuickStart.md) | [↑ Go to the Table of Content ↑](../README.md) | [Continue to Post-processing →](PostProcessing.md)
@@ -35,7 +35,7 @@ Before developing a module, one should have a bare idea of what the QualityContr
 
 ![alt text](images/Architecture.png)
 
-The main data flow is represented in blue. Data samples are selected by the Data Sampling (not represented) and sent to the QC tasks, either on the same machines or on other machines. The tasks produce TObjects, usually histograms, that are merged (if needed) and then checked. The checkers output the received TObject along with a quality flag. The TObject can be modified by the Checker. Finally the TObject and its quality are stored in the repository.
+The main data flow is represented in blue. Data samples are selected by the Data Sampling (not represented) and sent to the QC tasks, either on the same machines or on other machines. The tasks produce TObjects encapsulated in a MonitorObject, usually histograms, that are merged (if needed) and then checked. The checkers output the received MonitorObject along with a QualityObject. The MonitorObject can be modified by the Checker. Finally the MonitorObject and the QualityObject(s) are stored in the repository.
 
 ### DPL
 
@@ -147,6 +147,17 @@ The Quality Control uses _plugins_ to load the actual code to be executed by the
 
 The same code, the same class, can be run many times in parallel. It means that you can run several qc tasks (no uppercase, i.e. processes) in parallel, each executing the same code defined in the same Task (uppercase, the class). Similarly, one Check can be executed against different Monitor Objects and Tasks.
 
+### Repository
+
+QC results (MonitorObjects and QualityObjects) are stored in a repository that we usually call the QCDB. Indeed, the underlying technology is the one of the CCDB (Condition and Calibration DataBase). As a matter of fact we use the test instance of the CCDB for the tests and development (ccdb-test.cern.ch:8080). In production, we will have a different instance distinct from the CCDB. 
+
+#### Paths
+
+We use a consistent system of path for the objects we store in the QCDB:
+* MonitorObjects: ```qc/<detectorCode>/MO/<taskName>/<moName>```
+* QualityObjects: ```qc/<detectorCode>/QO/<checkName>[/<moName>]```  
+The last, optional, part depends on the policy (read more about that [later](#Check)).
+
 ## Module creation
 
 Before starting to develop the code, one should create a new module if it does not exist yet. Typically each detector team should prepare a module.
@@ -227,7 +238,7 @@ Now we can run it
 o2-qc-run-producer | o2-qc --config json://$HOME/alice/QualityControl/Modules/TST/basic-tst.json
 ```
 
-You should see an object `example` in `/qc/TST/MyRawDataQcTask` at qcg-test.cern.ch.
+You should see an object `example` in `/qc/TST/MO/MyRawDataQcTask` at qcg-test.cern.ch.
 
 ## Modification of the Task
 
@@ -278,11 +289,14 @@ A Check is a function that determines the quality of the Monitor Objects produce
     * _OnAny_ (default) - if any of the declared monitor objects change, might trigger even if not all are ready
     * _OnAnyNonZero_ - if any of the declared monitor objects change with assurance that there are all MOs
     * _OnAll_ - if all of the monitor objects updated at least once
+    * _OnEachSeparately_ - if MOs from any task are updated, runs the same check separately on each of them,
+     obtaining one Quality per one MO. Note that if any source Task updates their MOs, all of them will be checked
+      again. Prefer to assign one Check per one Task to avoid this behaviour.
     * if the MOs are not declared or _MO_: "all" in one or more dataSources, the above policy don't apply, the `check` will be triggered whenever a new MonitorObject is received from one of the inputs
 * __dataSource__ - declaration of the `check` input
     * _type_ - currently only supported is _Task_
     * _name_ - name of the _Task_
-    * _MOs_ - list of MonitorObjects name or "all"
+    * _MOs_ - list of MonitorObjects name or "all" (not as a list!)
 
 ### Implementation
 After the creation of the module described in the above section, every Check functionality requires a separate implementation. The module might implement several Check classes.

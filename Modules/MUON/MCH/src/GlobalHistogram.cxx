@@ -318,6 +318,7 @@ void GlobalHistogram::getDeCenterST4(int de, float& xB0, float& yB0, float& xNB0
   o2::mch::contour::BBox<double> bbox = o2::mch::mapping::getBBox(csegment);
   //std::cout<<"DE "<<de<<"  BBOX "<<bbox<<std::endl;
 
+
   double xmin = bbox.xmin();
   double xmax = bbox.xmax();
   if (xId == 0) {
@@ -429,7 +430,6 @@ void GlobalHistogram::set(std::map<int, TH2F*>& histB, std::map<int, TH2F*>& his
         continue;
       }
 
-
       // loop on destination bins
       int binXmin = GetXaxis()->FindBin(xMin[i] + binWidthX / 2);
       int binXmax = GetXaxis()->FindBin(xMax[i] - binWidthX / 2);
@@ -476,6 +476,7 @@ void GlobalHistogram::set(std::map<int, TH2F*>& histB, std::map<int, TH2F*>& his
           if (hist[i]->GetXaxis()->GetBinCenter(srcBinXmax) > maxX) {
             srcBinXmax -= 1;
           }
+
 
           if(by == (binYmin+binYmax)/2 && (de==500 || de==509)) {
             //std::cout<<"DE "<<de<<(i==0 ? "B " : "NB")<<"  minX="<<minX<<"  maxX="<<maxX<<std::endl;

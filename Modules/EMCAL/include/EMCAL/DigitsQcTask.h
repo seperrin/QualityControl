@@ -8,6 +8,7 @@
 
 #include "QualityControl/TaskInterface.h"
 #include <array>
+#include <TProfile2D.h>
 
 class TH1;
 class TH2;
@@ -50,12 +51,19 @@ class DigitsQcTask final : public TaskInterface
   void endOfActivity(Activity& activity) override;
   void reset() override;
 
+  void setThreshold(Double_t threshold) { mCellThreshold = threshold; }
+
  private:
-  std::array<TH2*, 2> mDigitAmplitude;      ///< Digit amplitude
-  std::array<TH2*, 2> mDigitTime;           ///< Digit time
-  TH1* mDigitAmplitudeEMCAL = nullptr;      ///< Digit amplitude in EMCAL
-  TH1* mDigitAmplitudeDCAL = nullptr;       ///< Digit amplitude in DCAL
-  o2::emcal::Geometry* mGeometry = nullptr; ///< EMCAL geometry
+  Double_t mCellThreshold = 0.5;              ///< energy cell threshold
+  std::array<TH2*, 2> mDigitAmplitude;        ///< Digit amplitude
+  std::array<TH2*, 2> mDigitTime;             ///< Digit time
+  TH2* mDigitOccupancy = nullptr;             ///< Digit occupancy EMCAL and DCAL
+  TH2* mDigitOccupancyThr = nullptr;          ///< Digit occupancy EMCAL and DCAL with Energy trheshold
+  TProfile2D* mIntegratedOccupancy = nullptr; ///< Digit integrated occupancy
+  TH1* mDigitAmplitudeEMCAL = nullptr;        ///< Digit amplitude in EMCAL
+  TH1* mDigitAmplitudeDCAL = nullptr;         ///< Digit amplitude in DCAL
+  TH1* mnumberEvents = nullptr;               ///< Number of Events for normalization
+  o2::emcal::Geometry* mGeometry = nullptr;   ///< EMCAL geometry
 };
 
 } // namespace emcal

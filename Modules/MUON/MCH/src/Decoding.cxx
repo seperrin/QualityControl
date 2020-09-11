@@ -14,6 +14,7 @@
 #include "MCHBase/Digit.h"
 #define __STDC_FORMAT_MACROS
 #include <cinttypes>
+#include <fstream>
 
 using namespace std;
 

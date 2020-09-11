@@ -58,14 +58,18 @@ class DatabaseInterface
   /**
    * Stores the serialized MonitorObject in the database.
    * @param mo The MonitorObject to serialize and store.
+   * @param from The timestamp indicating the start of object's validity (ms since epoch).
+   * @param to The timestamp indicating the end of object's validity (ms since epoch).
    */
-  virtual void storeMO(std::shared_ptr<o2::quality_control::core::MonitorObject> mo) = 0;
+  virtual void storeMO(std::shared_ptr<o2::quality_control::core::MonitorObject> mo, long from = -1, long to = -1) = 0;
 
   /**
    * Stores the serialized QualityObject in the database.
    * @param qo The QualityObject to serialize and store.
+   * @param from The timestamp indicating the start of object's validity (ms since epoch).
+   * @param to The timestamp indicating the end of object's validity (ms since epoch).
    */
-  virtual void storeQO(std::shared_ptr<o2::quality_control::core::QualityObject> qo) = 0;
+  virtual void storeQO(std::shared_ptr<o2::quality_control::core::QualityObject> qo, long from = -1, long to = -1) = 0;
 
   /**
    * \brief Look up a monitor object and return it.
@@ -92,18 +96,21 @@ class DatabaseInterface
   /**
    * \brief Look up a monitor object and return it in JSON format.
    * Look up a monitor object and return it in JSON format if found or an empty string if not.
+   * The headers associated with the object are added to the JSON object under the key "metadata".
    * @deprecated
    */
   virtual std::string retrieveMOJson(std::string taskName, std::string objectName, long timestamp = -1) = 0;
   /**
    * \brief Look up a quality object and return it in JSON format.
    * Look up a quality object and return it in JSON format if found or an empty string if not.
+   * The headers associated with the object are added to the JSON object under the key "metadata".
    * @deprecated
    */
   virtual std::string retrieveQOJson(std::string qoPath, long timestamp = -1) = 0;
   /**
    * \brief Look up an object and return it in JSON format.
    * Look up an object and return it in JSON format if found or an empty string if not.
+   * The headers associated with the object are added to the JSON object under the key "metadata".
    * \param path the path of the object
    * \param timestamp the timestamp to query the object
    * \param metadata filters under the form of key-value pairs to select data
@@ -112,6 +119,7 @@ class DatabaseInterface
   /**
    * \brief Look up an object and return it in JSON format.
    * Look up an object and return it in JSON format if found or an empty string if not.
+   * The headers associated with the object are added to the JSON object under the key "metadata".
    * A default timestamp of -1 is used, usually meaning to use the current timestamp.
    * \param path the path to the object
    */

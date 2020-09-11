@@ -62,6 +62,7 @@ add_library(QualityControl
             src/TrendingTaskConfig.cxx
             src/DummyDatabase.cxx
             src/DataProducer.cxx
+            src/HistoProducer.cxx
             src/DataProducerExample.cxx
             src/MonitorObjectCollection.cxx)
 
@@ -95,6 +96,7 @@ target_link_libraries(QualityControl
                              ms_gsl::ms_gsl
                              QualityControlTypes
                              O2::Mergers
+                             $<$<TARGET_EXISTS:O2::DataSampling>:O2::DataSampling>
                       PRIVATE Boost::system
                               $<$<BOOL:${ENABLE_MYSQL}>:MySQL::MySQL>
                               $<$<BOOL:${ENABLE_MYSQL}>:ROOT::RMySQL> ROOT::Gui
@@ -128,6 +130,7 @@ add_root_dictionary(QualityControl
 set(EXE_SRCS
     src/runDataProducer.cxx
     src/runDataProducerExample.cxx
+    src/runHistoProducer.cxx
     src/runQC.cxx
     src/runBasic.cxx
     src/runAdvanced.cxx
@@ -140,6 +143,7 @@ set(EXE_SRCS
 set(EXE_NAMES
     o2-qc-run-producer
     o2-qc-run-producer-basic
+    o2-qc-run-histo-producer
     o2-qc
     o2-qc-run-basic
     o2-qc-run-advanced
@@ -154,6 +158,7 @@ set(EXE_NAMES
 set(EXE_OLD_NAMES
     qcRunProducer
     o2-qc-run-producer-basic
+    o2-qc-run-histo-producer
     o2-qc-run-qc
     qcRunBasic
     qcRunAdvanced
@@ -237,6 +242,7 @@ set(TEST_SRCS
     test/testCheckWorkflow.cxx
     test/testWorkflow.cxx
     test/testVersion.cxx
+    test/testRepoPathUtils.cxx
   )
 
 set(TEST_ARGS
@@ -264,6 +270,7 @@ set(TEST_ARGS
     ""
     "-b --run"
     "-b --run"
+    ""
     ""
   )
 
@@ -297,9 +304,9 @@ endforeach()
 target_include_directories(testVersion PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>)
 target_include_directories(testCcdbDatabase PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>)
 
-set_property(TEST testWorkflow PROPERTY TIMEOUT 20)
+set_property(TEST testWorkflow PROPERTY TIMEOUT 60)
 set_property(TEST testWorkflow PROPERTY LABELS slow)
-set_property(TEST testCheckWorkflow PROPERTY TIMEOUT 20)
+set_property(TEST testCheckWorkflow PROPERTY TIMEOUT 60)
 set_property(TEST testCheckWorkflow PROPERTY LABELS slow)
 set_property(TEST testObjectsManager PROPERTY TIMEOUT 20)
 set_property(TEST testObjectsManager PROPERTY LABELS slow)
@@ -307,6 +314,14 @@ set_property(TEST testCcdbDatabase PROPERTY TIMEOUT 15)
 set_property(TEST testCcdbDatabase PROPERTY LABELS slow)
 set_property(TEST testCcdbDatabaseExtra PROPERTY LABELS manual)
 set_property(TEST testTrendingTask PROPERTY LABELS manual)
+
+# Add a functional test (QC-336) 
+string(RANDOM UNIQUE_ID)
+configure_file(basic-functional.json.in ${CMAKE_BINARY_DIR}/tests/basic-functional.json) # substitute the unique id in the task name
+add_test(NAME functional_test COMMAND o2-qc-functional-test.sh)
+set_tests_properties(functional_test PROPERTIES ENVIRONMENT "JSON_DIR=${CMAKE_BINARY_DIR}/tests;UNIQUE_ID=${UNIQUE_ID}")
+set_property(TEST functional_test PROPERTY LABELS slow)
+set_property(TEST functional_test PROPERTY TIMEOUT 60)
 
 # ---- Install ----
 
@@ -367,8 +382,10 @@ install(FILES example-default.json
               alfa.json
               dataDump.json
               basic.json
+              basic-external-histo.json
               basic-no-sampling.json
               advanced.json
+              advanced-external-histo.json
               multiNode.json
               readout.json
               readout-no-sampling.json
@@ -381,7 +398,7 @@ install(FILES example-default.json
 
 install(PROGRAMS script/RepoCleaner/1_per_hour.py script/RepoCleaner/Ccdb.py script/RepoCleaner/skip.py
                  script/RepoCleaner/repoCleaner.py script/RepoCleaner/1_per_run.py script/RepoCleaner/none_kept.py
-                 script/o2-qc-database-setup.sh
+                 script/o2-qc-database-setup.sh script/o2-qc-functional-test.sh
         DESTINATION bin)
 
 # ---- Copy test files ----

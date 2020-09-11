@@ -18,6 +18,7 @@
 
 #include <Rtypes.h>
 #include <string>
+#include <map>
 
 namespace o2::quality_control::core
 {
@@ -53,12 +54,12 @@ class Quality
   friend std::ostream& operator<<(std::ostream& out, const Quality& q); // output
 
   /**
-   * \brief Checks whether this quality object is worst than another one.
+   * \brief Checks whether this quality object is worse than another one.
    * If compared to Null it returns false.
    * @param quality
    * @return true if it is worse, false otherwise or if compared to Quality::Null.
    */
-  bool isWorstThan(const Quality& quality) const { return this->mLevel > quality.getLevel(); }
+  bool isWorseThan(const Quality& quality) const { return this->mLevel > quality.getLevel(); }
   /**
    * \brief Checks whether this quality object is better than another one.
    * If compared to Null it returns false.
@@ -67,11 +68,32 @@ class Quality
    */
   bool isBetterThan(const Quality& quality) const { return this->mLevel < quality.getLevel(); }
 
+  /// \brief Add key value pair that will end up in the database
+  /// Add a metadata (key value pair) to the QualityObject. It will be stored in the database.
+  /// If the key already exists the value will be updated.
+  void addMetadata(std::string key, std::string value);
+  /// \brief Add key value pairs that will end up in the database as metadata of the object
+  /// Add all the key-value pairs in the map to the MonitorObject. It will be stored in the database as metadata.
+  /// If a key already exists the value will NOT be updated.
+  void addMetadata(std::map<std::string, std::string> pairs);
+  /// \brief Update the value of metadata.
+  /// If the key does not exist it will ignore it.
+  void updateMetadata(std::string key, std::string value);
+  /// \brief Get the full map of user's metadata
+  const std::map<std::string, std::string>& getMetadataMap() const;
+  /// \brief Overwrite the existing metadata.
+  void overwriteMetadata(std::map<std::string, std::string> pairs);
+  /// \brief Get a metadata
+  /// \return the value corresponding to the key if it was found.
+  /// \throw ObjectNotFoundError in case the key is not found.
+  const std::string getMetadata(std::string key);
+
  private:
   unsigned int mLevel; /// 0 is no quality, 1 is best quality, then it only goes downhill...
   std::string mName;
+  std::map<std::string, std::string> mUserMetadata;
 
-  ClassDef(Quality, 1);
+  ClassDef(Quality, 2);
 };
 
 } // namespace o2::quality_control::core

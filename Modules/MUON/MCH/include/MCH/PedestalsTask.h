@@ -80,6 +80,6 @@ class PedestalsTask final : public TaskInterface
     std::string noisyfilename;
 };
 
-} // namespace o2
+} // namespace o2::quality_control_modules::muonchambers
 
 #endif // QC_MODULE_MUONCHAMBERS_PEDESTALSTASK_H

@@ -18,15 +18,11 @@
 
 #include <memory>
 #include <Framework/ServiceRegistry.h>
+#include <boost/property_tree/ptree_fwd.hpp>
 #include "QualityControl/PostProcessingInterface.h"
 #include "QualityControl/PostProcessingConfig.h"
 #include "QualityControl/Triggers.h"
 #include "QualityControl/DatabaseInterface.h"
-
-namespace o2::configuration
-{
-class ConfigurationInterface;
-}
 
 namespace o2::quality_control::postprocessing
 {
@@ -40,11 +36,11 @@ namespace o2::quality_control::postprocessing
 class PostProcessingRunner
 {
  public:
-  PostProcessingRunner(std::string name, std::string configPath);
+  PostProcessingRunner(std::string name);
   ~PostProcessingRunner() = default;
 
   /// \brief Initialization. Throws on errors.
-  void init();
+  void init(const boost::property_tree::ptree& config);
   /// \brief One iteration over the event loop. Throws on errors. Returns false when it can gracefully exit.
   bool run();
   /// \brief Start transition. Throws on errors.
@@ -53,6 +49,11 @@ class PostProcessingRunner
   void stop();
   /// \brief Reset transition. Throws on errors.
   void reset();
+  /// \brief Runs the task over selected timestamps, performing the full start, run, stop cycle.
+  ///
+  /// \param t A vector with timestamps (ms since epoch).
+  ///          The first is used for task initialisation, the last for task finalisation, so at least two are required.
+  void runOverTimestamps(const std::vector<uint64_t>& t);
 
  private:
   void doInitialize(Trigger trigger);
@@ -77,7 +78,6 @@ class PostProcessingRunner
   std::string mConfigPath = "";
   PostProcessingConfig mConfig;
   std::shared_ptr<o2::quality_control::repository::DatabaseInterface> mDatabase;
-  std::shared_ptr<configuration::ConfigurationInterface> mConfigFile;
 };
 
 } // namespace o2::quality_control::postprocessing

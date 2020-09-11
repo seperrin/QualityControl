@@ -17,6 +17,7 @@
 
 #include <iostream>
 #include <Common/Exceptions.h>
+#include "QualityControl/RepoPathUtils.h"
 
 ClassImp(o2::quality_control::core::MonitorObject)
 
@@ -86,10 +87,18 @@ void MonitorObject::updateMetadata(std::string key, std::string value)
   }
 }
 
+void MonitorObject::addOrUpdateMetadata(std::string key, std::string value)
+{
+  if (mUserMetadata.count(key) > 0) {
+    mUserMetadata[key] = value;
+  } else {
+    mUserMetadata.insert({ key, value });
+  }
+}
+
 std::string MonitorObject::getPath() const
 {
-  string path = "qc/" + getDetectorName() + "/" + getTaskName() + "/" + getName();
-  return path;
+  return RepoPathUtils::getMoPath(this);
 }
 
 } // namespace o2::quality_control::core

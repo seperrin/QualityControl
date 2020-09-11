@@ -27,7 +27,7 @@ namespace o2::quality_control::postprocessing
 /// \brief  TrendingTask configuration structure
 struct TrendingTaskConfig : PostProcessingConfig {
   TrendingTaskConfig() = default;
-  TrendingTaskConfig(std::string name, configuration::ConfigurationInterface& config);
+  TrendingTaskConfig(std::string name, const boost::property_tree::ptree& config);
   ~TrendingTaskConfig() = default;
 
   struct Plot {
@@ -36,6 +36,7 @@ struct TrendingTaskConfig : PostProcessingConfig {
     std::string varexp;
     std::string selection;
     std::string option;
+    std::string graphErrors;
   };
 
   struct DataSource {

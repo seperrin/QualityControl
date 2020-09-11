@@ -15,34 +15,35 @@
 #include "QualityControl/DatabaseFactory.h"
 #include "QualityControl/QcInfoLogger.h"
 
-#include <Configuration/ConfigurationFactory.h>
+#include <boost/property_tree/ptree.hpp>
 
-using namespace o2::configuration;
 using namespace o2::quality_control::core;
 using namespace o2::quality_control::repository;
 
 namespace o2::quality_control::postprocessing
 {
 
-PostProcessingRunner::PostProcessingRunner(std::string name, std::string configPath) //
-  : mName(name), mConfigPath(configPath)
+PostProcessingRunner::PostProcessingRunner(std::string name) //
+  : mName(name)
 {
 }
 
-void PostProcessingRunner::init()
+void PostProcessingRunner::init(const boost::property_tree::ptree& config)
 {
   ILOG(Info) << "Initializing PostProcessingRunner" << ENDM;
 
-  mConfigFile = ConfigurationFactory::getConfiguration(mConfigPath);
-  mConfig = PostProcessingConfig(mName, *mConfigFile);
-  mConfigFile->setPrefix(""); // protect from having the prefix changed by PostProcessingConfig
+  mConfig = PostProcessingConfig(mName, config);
 
   // configuration of the database
-  mDatabase = DatabaseFactory::create(mConfigFile->get<std::string>("qc.config.database.implementation"));
-  mDatabase->connect(mConfigFile->getRecursiveMap("qc.config.database"));
+  mDatabase = DatabaseFactory::create(config.get<std::string>("qc.config.database.implementation"));
+  std::unordered_map<std::string, std::string> dbConfig;
+  for (const auto& [key, value] : config.get_child("qc.config.database")) {
+    dbConfig[key] = value.get_value<std::string>();
+  }
+  mDatabase->connect(dbConfig);
   ILOG(Info) << "Database that is going to be used : " << ENDM;
-  ILOG(Info) << ">> Implementation : " << mConfigFile->get<std::string>("qc.config.database.implementation") << ENDM;
-  ILOG(Info) << ">> Host : " << mConfigFile->get<std::string>("qc.config.database.host") << ENDM;
+  ILOG(Info) << ">> Implementation : " << config.get<std::string>("qc.config.database.implementation") << ENDM;
+  ILOG(Info) << ">> Host : " << config.get<std::string>("qc.config.database.host") << ENDM;
   mServices.registerService<DatabaseInterface>(mDatabase.get());
 
   // setup user's task
@@ -54,7 +55,7 @@ void PostProcessingRunner::init()
 
     mTaskState = TaskState::Created;
     mTask->setName(mConfig.taskName);
-    mTask->configure(mConfig.taskName, *mConfigFile);
+    mTask->configure(mConfig.taskName, config);
   } else {
     throw std::runtime_error("Failed to create the task '" + mConfig.taskName + "'");
   }
@@ -89,12 +90,29 @@ bool PostProcessingRunner::run()
   return true;
 }
 
+void PostProcessingRunner::runOverTimestamps(const std::vector<uint64_t>& timestamps)
+{
+  if (timestamps.size() < 2) {
+    throw std::runtime_error(
+      "At least two timestamps should be specified, " + std::to_string(timestamps.size()) +
+      " given. One is for the initialization, zero or more for update, one for finalization");
+  }
+
+  ILOG(Info) << "Running the task '" << mTask->getName() << "' over " << timestamps.size() << " timestamps." << ENDM;
+
+  doInitialize({ TriggerType::UserOrControl, timestamps.front() });
+  for (size_t i = 1; i < timestamps.size() - 1; i++) {
+    doUpdate({ TriggerType::UserOrControl, timestamps[i] });
+  }
+  doFinalize({ TriggerType::UserOrControl, timestamps.back() });
+}
+
 void PostProcessingRunner::start()
 {
   if (mTaskState == TaskState::Created || mTaskState == TaskState::Finished) {
     mInitTriggers = trigger_helpers::createTriggers(mConfig.initTriggers);
     if (trigger_helpers::hasUserOrControlTrigger(mConfig.initTriggers)) {
-      doInitialize(Trigger::UserOrControl);
+      doInitialize({ TriggerType::UserOrControl });
     }
   } else if (mTaskState == TaskState::Running) {
     ILOG(Info) << "Requested start, but the user task is already running - doing nothing." << ENDM;
@@ -109,7 +127,7 @@ void PostProcessingRunner::stop()
 {
   if (mTaskState == TaskState::Created || mTaskState == TaskState::Running) {
     if (trigger_helpers::hasUserOrControlTrigger(mConfig.stopTriggers)) {
-      doFinalize(Trigger::UserOrControl);
+      doFinalize({ TriggerType::UserOrControl });
     }
   } else if (mTaskState == TaskState::Finished) {
     ILOG(Info) << "Requested stop, but the user task is already finalized - doing nothing." << ENDM;
@@ -154,7 +172,7 @@ void PostProcessingRunner::doUpdate(Trigger trigger)
 void PostProcessingRunner::doFinalize(Trigger trigger)
 {
   ILOG(Info) << "Finalizing the user task due to trigger '" << trigger << "'" << ENDM;
-  mTask->finalize(UserOrControl, mServices);
+  mTask->finalize(trigger, mServices);
   mTaskState = TaskState::Finished;
 }
 

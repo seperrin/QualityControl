@@ -12,7 +12,12 @@
 /// \file    testCheckWorkflow.cxx
 /// \author  Rafal Pacholek
 ///
+#if __has_include(<Framework/DataSampling.h>)
 #include <Framework/DataSampling.h>
+#else
+#include <DataSampling/DataSampling.h>
+using namespace o2::utilities;
+#endif
 #include <Framework/CompletionPolicyHelpers.h>
 #include <Framework/DeviceSpec.h>
 #include "QualityControl/InfrastructureGenerator.h"
@@ -50,7 +55,7 @@ using namespace o2::quality_control::checker;
 /**
  * Test description
  * 
- * Test a complex configuration with 3 tasks and 3 checks.
+ * Test a complex configuration with 3 tasks and 4 checks.
  * Checks sources contain several tasks with different policies.
  *
  * The goal is to check whether all checks are triggered and generate Quality Objects.

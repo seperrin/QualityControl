@@ -9,9 +9,9 @@
 // or submit itself to any jurisdiction.
 
 ///
-/// \file   testCcdbDatabase.cxx
+/// \file   testCcdbDatabaseExtra.cxx
 /// \author Adam Wegrzynek
-/// \author Bartheley von Haller
+/// \author Barthelemy von Haller
 ///
 
 #include "QualityControl/DatabaseFactory.h"
@@ -107,10 +107,7 @@ BOOST_AUTO_TEST_CASE(ccdb_store)
   oldTimestamp = CcdbDatabase::getCurrentTimestamp();
   f.backend->storeMO(mo1);
 
-  Quality q = Quality::Bad;
-  std::vector<std::string> inputs;
-  shared_ptr<QualityObject> qo = make_shared<QualityObject>("checkName", inputs, "TST");
-  qo->setQuality(q);
+  shared_ptr<QualityObject> qo = make_shared<QualityObject>(Quality::Bad, "checkName", "TST", "OnAll");
   f.backend->storeQO(qo);
 }
 
@@ -145,21 +142,21 @@ BOOST_AUTO_TEST_CASE(ccdb_retrieve_former_versions, *utf::depends_on("ccdb_store
   f.backend->storeMO(mo1);
 
   // Retrieve old object stored at timestampStorage
-  std::shared_ptr<MonitorObject> mo = f.backend->retrieveMO("qc/TST/my/task", "asdf/asdf", oldTimestamp);
+  std::shared_ptr<MonitorObject> mo = f.backend->retrieveMO("qc/TST/MO/my/task", "asdf/asdf", oldTimestamp);
   BOOST_CHECK(mo);
   TH1F* old = dynamic_cast<TH1F*>(mo->getObject());
   BOOST_CHECK_NE(old, nullptr);
   BOOST_CHECK_EQUAL(old->GetEntries(), 10000);
 
   // Retrieve latest object with timestamp
-  std::shared_ptr<MonitorObject> mo2 = f.backend->retrieveMO("qc/TST/my/task", "asdf/asdf", CcdbDatabase::getCurrentTimestamp());
+  std::shared_ptr<MonitorObject> mo2 = f.backend->retrieveMO("qc/TST/MO/my/task", "asdf/asdf", CcdbDatabase::getCurrentTimestamp());
   BOOST_CHECK(mo2);
   TH1F* latest = dynamic_cast<TH1F*>(mo2->getObject());
   BOOST_CHECK_NE(latest, nullptr);
   BOOST_CHECK_EQUAL(latest->GetEntries(), 10001);
 
   // Retrieve latest object without timetsamp
-  std::shared_ptr<MonitorObject> mo3 = f.backend->retrieveMO("qc/TST/my/task", "asdf/asdf");
+  std::shared_ptr<MonitorObject> mo3 = f.backend->retrieveMO("qc/TST/MO/my/task", "asdf/asdf");
   BOOST_CHECK(mo3);
   TH1F* latest2 = dynamic_cast<TH1F*>(mo3->getObject());
   BOOST_CHECK_NE(latest2, nullptr);

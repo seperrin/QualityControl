@@ -46,7 +46,7 @@ class TrendingTask : public PostProcessingInterface
   TrendingTask() = default;
   ~TrendingTask() override = default;
 
-  void configure(std::string name, o2::configuration::ConfigurationInterface& config) override;
+  void configure(std::string name, const boost::property_tree::ptree& config) override;
   void initialize(Trigger, framework::ServiceRegistry&) override;
   void update(Trigger, framework::ServiceRegistry&) override;
   void finalize(Trigger, framework::ServiceRegistry&) override;
@@ -56,16 +56,15 @@ class TrendingTask : public PostProcessingInterface
     Int_t runNumber = 0;
   };
 
-  void trendValues();
-  void storePlots();
-  void storeTrend();
+  void trendValues(repository::DatabaseInterface&);
+  void storePlots(repository::DatabaseInterface&);
+  void storeTrend(repository::DatabaseInterface&);
 
   TrendingTaskConfig mConfig;
   MetaData mMetaData;
   UInt_t mTime;
   std::unique_ptr<TTree> mTrend;
   std::unordered_map<std::string, std::unique_ptr<Reductor>> mReductors;
-  repository::DatabaseInterface* mDatabase = nullptr;
 };
 
 } // namespace o2::quality_control::postprocessing

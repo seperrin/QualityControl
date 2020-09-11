@@ -27,12 +27,13 @@
 #ifdef MCH_HAS_MAPPING_FACTORY
 #include "MCHMappingFactory/CreateSegmentation.h"
 #endif
-//#define QC_MCH_SAVE_TEMP_ROOTFILE
 
 using namespace std;
 using namespace o2::framework;
 
-static FILE* flog = NULL;
+//#define QC_MCH_SAVE_TEMP_ROOTFILE 1
+
+#define MCH_FFEID_MAX (31 * 2 + 1)
 
 #define QC_MCH_SAVE_TEMP_ROOTFILE 1
 
@@ -73,14 +74,10 @@ namespace muonchambers
 {
 PedestalsTask::PedestalsTask() : TaskInterface()
 {
-  flog = nullptr;
 }
 
 PedestalsTask::~PedestalsTask()
 {
-  printf("~PedestalsTask() called\n");
-  if (flog)
-    fclose(flog);
 }
 
 void PedestalsTask::initialize(o2::framework::InitContext& /*ctx*/)
@@ -127,6 +124,20 @@ void PedestalsTask::initialize(o2::framework::InitContext& /*ctx*/)
     getObjectsManager()->startPublishing(mHistogramNoise);
     mHistogramNoiseMCH = new GlobalHistogram("QcMuonChambers_Noise_AllDE", "Noise");
     mHistogramNoiseMCH->init();
+
+    mHistogramPedestals = new TH2F("QcMuonChambers_Pedestals", "QcMuonChambers - Pedestals",
+                                   (MCH_FFEID_MAX + 1) * 12 * 40, 0, (MCH_FFEID_MAX + 1) * 12 * 40, 64, 0, 64);
+    //getObjectsManager()->startPublishing(mHistogramPedestals);
+    mHistogramPedestalsMCH = new GlobalHistogram("QcMuonChambers_Pedestals_AllDE", "Pedestals");
+    mHistogramPedestalsMCH->init();
+    getObjectsManager()->startPublishing(mHistogramPedestalsMCH);
+
+    mHistogramNoise = new TH2F("QcMuonChambers_Noise", "QcMuonChambers - Noise",
+                               (MCH_FFEID_MAX + 1) * 12 * 40, 0, (MCH_FFEID_MAX + 1) * 12 * 40, 64, 0, 64);
+    //getObjectsManager()->startPublishing(mHistogramNoise);
+    mHistogramNoiseMCH = new GlobalHistogram("QcMuonChambers_Noise_AllDE", "Noise");
+    mHistogramNoiseMCH->init();
+    getObjectsManager()->startPublishing(mHistogramNoiseMCH);
 
     uint32_t dsid;
     std::vector<int> DEs;
@@ -265,7 +276,7 @@ void PedestalsTask::fill_noise_distributions()
         o2::mch::mapping::Segmentation segment(de);
         int padid = segment.findPadByFEE(dsid, chan_addr);
         if(padid < 0) {
-          //fprintf(flog,"Invalid pad: %d %d %d\n", link_id, dsid, hit.chan_addr);
+          //fprintf(stdout,"Invalid pad: %d %d %d\n", link_id, dsid, hit.chan_addr);
           continue;
         }
 
@@ -276,7 +287,7 @@ void PedestalsTask::fill_noise_distributions()
         float szmax = padSizeX;
         if (szmax < padSizeY)
           szmax = padSizeY;
-        //fprintf(flog,"%d %d %d -> %d %f %f\n", de, dsid, chan_addr, padid, padSizeX, padSizeY);
+        //fprintf(stdout,"%d %d %d -> %d %f %f\n", de, dsid, chan_addr, padid, padSizeX, padSizeY);
 
         int szid = 0;
         if (fabs(szmax - 2.5) < 0.001)
@@ -392,7 +403,9 @@ void PedestalsTask::monitorDataReadout(o2::framework::ProcessingContext& ctx)
 
   std::vector<SampaHit>& hits = mDecoder.getHits();
   if (mPrintLevel >= 1)
+
     fprintf(flog, "hits size: %lu\n", hits.size());
+
   for (uint32_t i = 0; i < hits.size(); i++) {
     SampaHit& hit = hits[i];
     if (hit.link_id >= 24 || hit.ds_addr >= 40 || hit.chan_addr >= 64) {
@@ -512,14 +525,14 @@ void PedestalsTask::monitorDataDigits(const o2::framework::DataRef& input)
 
   const auto* header = o2::header::get<header::DataHeader*>(input.header);
   if (mPrintLevel >= 1)
-    fprintf(flog, "Header: %p\n", (void*)header);
+    fprintf(stdout, "Header: %p\n", (void*)header);
   if (!header)
     return;
   //QcInfoLogger::GetInstance() << "payloadSize: " << header->payloadSize << AliceO2::InfoLogger::InfoLogger::endm;
   if (mPrintLevel >= 1)
-    fprintf(flog, "payloadSize: %d\n", (int)header->payloadSize);
+    fprintf(stdout, "payloadSize: %d\n", (int)header->payloadSize);
   if (mPrintLevel >= 1)
-    fprintf(flog, "payload: %s\n", input.payload);
+    fprintf(stdout, "payload: %s\n", input.payload);
 
   std::vector<o2::mch::Digit> digits{ 0 };
   o2::mch::Digit* digitsBuffer = NULL;
@@ -584,21 +597,18 @@ void PedestalsTask::monitorDataDigits(const o2::framework::DataRef& input)
           }
         }
       }
-      auto hNoiseXY = mHistogramNoiseXY[cathode].find(de);
-      if ((hNoiseXY != mHistogramNoiseXY[cathode].end()) && (hNoiseXY->second != NULL)) {
-        int binx_min = hNoiseXY->second->GetXaxis()->FindBin(padX - padSizeX / 2 + 0.1);
-        int binx_max = hNoiseXY->second->GetXaxis()->FindBin(padX + padSizeX / 2 - 0.1);
-        int biny_min = hNoiseXY->second->GetYaxis()->FindBin(padY - padSizeY / 2 + 0.1);
-        int biny_max = hNoiseXY->second->GetYaxis()->FindBin(padY + padSizeY / 2 - 0.1);
-        for (int by = biny_min; by <= biny_max; by++) {
-          for (int bx = binx_min; bx <= binx_max; bx++) {
-            hNoiseXY->second->SetBinContent(bx, by, rms);
-          }
+    }
+    auto hNoiseXY = mHistogramNoiseXY[cathode].find(de);
+    if ((hNoiseXY != mHistogramNoiseXY[cathode].end()) && (hNoiseXY->second != NULL)) {
+      int binx_min = hNoiseXY->second->GetXaxis()->FindBin(padX - padSizeX / 2 + 0.1);
+      int binx_max = hNoiseXY->second->GetXaxis()->FindBin(padX + padSizeX / 2 - 0.1);
+      int biny_min = hNoiseXY->second->GetYaxis()->FindBin(padY - padSizeY / 2 + 0.1);
+      int biny_max = hNoiseXY->second->GetYaxis()->FindBin(padY + padSizeY / 2 - 0.1);
+      for (int by = biny_min; by <= biny_max; by++) {
+        for (int bx = binx_min; bx <= binx_max; bx++) {
+          hNoiseXY->second->SetBinContent(bx, by, rms);
         }
       }
-    } catch (const std::exception& e) {
-      QcInfoLogger::GetInstance() << "[MCH] Detection Element " << de << " not found in mapping." << AliceO2::InfoLogger::InfoLogger::endm;
-      return;
     }
   }
 }
@@ -631,6 +641,10 @@ void PedestalsTask::endOfActivity(Activity& /*activity*/)
 {
   printf("PedestalsTask::endOfActivity() called\n");
   QcInfoLogger::GetInstance() << "endOfActivity" << AliceO2::InfoLogger::InfoLogger::endm;
+
+#ifdef QC_MCH_SAVE_TEMP_ROOTFILE
+  save_histograms();
+#endif
 }
 
 void PedestalsTask::reset()
