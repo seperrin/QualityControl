@@ -83,6 +83,13 @@ class PhysicsTask /*final*/ : public TaskInterface // todo add back the "final" 
     double NewMeanNorbitsDE[1100];
     
     int NbinsDE[1100];
+    
+    double MeanPseudoeffDE[1100];
+    double MeanPseudoeffDECycle[1100];
+    double LastPreclBNBDE[1100];
+    double NewPreclBNBDE[1100];
+    double LastPreclNumDE[1100];
+    double NewPreclNumDE[1100];
 
   std::vector<std::unique_ptr<mch::Digit>> digits;
   mch::Digit* digitsBuffer;
@@ -96,6 +103,12 @@ class PhysicsTask /*final*/ : public TaskInterface // todo add back the "final" 
     // TH1 de l'occupation moyenne par DE (intégré ou sur le cycle écoulé)
     TH1F* mMeanOccupancyPerDE;
     TH1F* mMeanOccupancyPerDECycle;
+    
+    // TH1 de la pseudoeff moyenne par DE (intégré ou sur le cycle écoulé)
+    TH1F* mMeanPseudoeffPerDE;
+    TH1F* mMeanPseudoeffPerDECycle;
+    
+    TH1F* mLandaunessCycle;
 
   TH2F* mHistogramNhits[1100];
   TH1F* mHistogramADCamplitude[1100];
@@ -109,6 +122,7 @@ class PhysicsTask /*final*/ : public TaskInterface // todo add back the "final" 
 //  std::map<int, TH2F*> mHistogramMeanNorbitsPerDE;
 
   std::map<int, TH1F*> mHistogramClchgDE;
+  std::map<int, TH1F*> mHistogramClchgDEOnCycle;
   std::map<int, TH1F*> mHistogramClsizeDE;
 
   std::map<int, TH2F*> mHistogramPreclustersXY[4];
