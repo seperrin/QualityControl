@@ -218,7 +218,7 @@ void PedestalsTask::initialize(o2::framework::InitContext& /*ctx*/)
     
     QcInfoLogger::GetInstance() << "Finished PedestalsTaskInit" << AliceO2::InfoLogger::InfoLogger::endm;
 
-  flog = stdout; //fopen("/root/qc.log", "w");
+ // flog = stdout; //fopen("/root/qc.log", "w");
 }
 
 void PedestalsTask::startOfActivity(Activity& /*activity*/)
@@ -404,7 +404,7 @@ void PedestalsTask::monitorDataReadout(o2::framework::ProcessingContext& ctx)
   std::vector<SampaHit>& hits = mDecoder.getHits();
   if (mPrintLevel >= 1)
 
-    fprintf(flog, "hits size: %lu\n", hits.size());
+    fprintf(stdout, "hits size: %lu\n", hits.size());
 
   for (uint32_t i = 0; i < hits.size(); i++) {
     SampaHit& hit = hits[i];
@@ -597,7 +597,6 @@ void PedestalsTask::monitorDataDigits(const o2::framework::DataRef& input)
           }
         }
       }
-    }
     auto hNoiseXY = mHistogramNoiseXY[cathode].find(de);
     if ((hNoiseXY != mHistogramNoiseXY[cathode].end()) && (hNoiseXY->second != NULL)) {
       int binx_min = hNoiseXY->second->GetXaxis()->FindBin(padX - padSizeX / 2 + 0.1);
@@ -610,7 +609,10 @@ void PedestalsTask::monitorDataDigits(const o2::framework::DataRef& input)
         }
       }
     }
+  }catch (...) {
+    throw;
   }
+}
 }
 
 void PedestalsTask::monitorData(o2::framework::ProcessingContext& ctx)
