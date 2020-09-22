@@ -29,7 +29,7 @@ using namespace o2::quality_control::core;
 using namespace o2::quality_control::postprocessing;
 using namespace o2::quality_control_modules::muonchambers;
 
-void MCHPostProcessing::configure(std::string name, o2::configuration::ConfigurationInterface& config)
+void MCHPostProcessing::configure(std::string name, const boost::property_tree::ptree& config)
 {
   mConfig = TrendingTaskConfig(name, config);
 }
@@ -55,19 +55,19 @@ void MCHPostProcessing::initialize(quality_control::postprocessing::Trigger, o2:
 //todo: see if OptimizeBaskets() indeed helps after some time
 void MCHPostProcessing::update(quality_control::postprocessing::Trigger, o2::framework::ServiceRegistry&)
 {
-  trendValues();
+  trendValues(*mDatabase);
 
-  storePlots();
-  storeTrend();
+  storePlots(*mDatabase);
+  storeTrend(*mDatabase);
 }
 
 void MCHPostProcessing::finalize(quality_control::postprocessing::Trigger, o2::framework::ServiceRegistry&)
 {
-  storePlots();
-  storeTrend();
+  storePlots(*mDatabase);
+  storeTrend(*mDatabase);
 }
 
-void MCHPostProcessing::storeTrend()
+void MCHPostProcessing::storeTrend(o2::quality_control::repository::DatabaseInterface&)
 {
   ILOG(Info) << "Storing the trend, entries: " << mTrend->GetEntries() << ENDM;
 
@@ -76,7 +76,7 @@ void MCHPostProcessing::storeTrend()
   mDatabase->storeMO(mo);
 }
 
-void MCHPostProcessing::trendValues()
+void MCHPostProcessing::trendValues(o2::quality_control::repository::DatabaseInterface&)
 {
   // We use current date and time. This for planned processing (not history). We still might need to use the objects
   // timestamps in the end, but this would become ambiguous if there is more than one data source.
@@ -107,7 +107,7 @@ void MCHPostProcessing::trendValues()
   mTrend->Fill();
 }
 
-void MCHPostProcessing::storePlots()
+void MCHPostProcessing::storePlots(o2::quality_control::repository::DatabaseInterface&)
 {
   ILOG(Info) << "Generating and storing " << mConfig.plots.size() << " plots." << ENDM;
 

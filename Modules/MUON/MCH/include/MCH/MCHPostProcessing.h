@@ -46,7 +46,7 @@ class MCHPostProcessing : public quality_control::postprocessing::PostProcessing
   MCHPostProcessing() = default;
   ~MCHPostProcessing() override = default;
 
-  void configure(std::string name, configuration::ConfigurationInterface& config) override;
+  void configure(std::string name, const boost::property_tree::ptree& config) override;
   void initialize(quality_control::postprocessing::Trigger, framework::ServiceRegistry&) override;
   void update(quality_control::postprocessing::Trigger, framework::ServiceRegistry&) override;
   void finalize(quality_control::postprocessing::Trigger, framework::ServiceRegistry&) override;
@@ -56,9 +56,9 @@ class MCHPostProcessing : public quality_control::postprocessing::PostProcessing
     Int_t runNumber = 0;
   };
 
-  void trendValues();
-  void storePlots();
-  void storeTrend();
+  void trendValues(o2::quality_control::repository::DatabaseInterface&);
+  void storePlots(o2::quality_control::repository::DatabaseInterface&);
+  void storeTrend(o2::quality_control::repository::DatabaseInterface&);
 
   quality_control::postprocessing::TrendingTaskConfig mConfig;
   MetaData mMetaData;
