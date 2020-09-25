@@ -138,6 +138,7 @@ class PhysicsTask /*final*/ : public TaskInterface // todo add back the "final" 
 //  GlobalHistogram* mHistogramMeanOrbitsPerDE[1];
 
   int mPrintLevel;
+  int numCyclesQC;
 };
 
 } // namespace muonchambers

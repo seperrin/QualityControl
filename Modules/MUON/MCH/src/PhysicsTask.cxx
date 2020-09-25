@@ -77,6 +77,7 @@ void PhysicsTask::initialize(o2::framework::InitContext& /*ctx*/)
   mDecoder.initialize();
 
   mPrintLevel = 1;
+  numCyclesQC = 0;
 
   flog = stdout; //fopen("/root/qc.log", "w");
   fprintf(stdout, "PhysicsTask initialization finished\n");
@@ -993,7 +994,7 @@ bool PhysicsTask::plotPrecluster(const o2::mch::PreCluster& preCluster, gsl::spa
 void PhysicsTask::endOfCycle()
 {
   QcInfoLogger::GetInstance() << "endOfCycle" << AliceO2::InfoLogger::InfoLogger::endm;
-
+    numCyclesQC++;
   for(int de = 100; de <= 1030; de++) {
     for(int i = 0; i < 3; i++) {
       //std::cout<<"DE "<<de<<"  i "<<i<<std::endl;
@@ -1387,28 +1388,32 @@ void PhysicsTask::endOfCycle()
     
     //Ici on fit les Landau
     
-    {
+    if(numCyclesQC % 4 == 0){
         auto hLandauCycle = mLandaunessCycle;
         TF1 *f1 = new TF1("f1","landau",400,10000); //1650V [200,5k]    1700V [400,10k]
         cout << "DE819 Landau Fit will happen now" <<endl;
         for(int de=0; de<1100; de++){
       //  int de =819;
             double chindf = 0;
+            double mpv = 0;
         auto hChargeOnCycle = mHistogramClchgDEOnCycle.find(de);
         if ((hChargeOnCycle != mHistogramClchgDEOnCycle.end()) && (hChargeOnCycle->second != NULL)) {
-            f1->SetParameter(1,1000);
+            f1->SetParameter(1,0);
             f1->SetParameter(2,500);            // Start Sigma at 500
-            f1->FixParameter(1,1000);           // Fix MPV 1650V 500    1700V 1000
+          //  f1->FixParameter(1,1000);           // Fix MPV 1650V 500    1700V 1000
             f1->SetParLimits(2,100,1000);
+            f1->SetParLimits(1,0,10000);
             f1->SetParLimits(0,0,100000);           // Say we want a positive Normalisation
             TFitResultPtr ptr = hChargeOnCycle->second->Fit("f1", "RB");
             chindf = f1->GetChisquare()/f1->GetNDF();
+            mpv = f1->GetParameter(1);
             cout << "Chi2/ndf :" << chindf << endl;
+            cout << "MPV :" << mpv << endl;
         }
-            hLandauCycle->SetBinContent(de+1, chindf);
+            hLandauCycle->SetBinContent(de+1, mpv);
         }
         hLandauCycle->Write();
-        std::cout << "Landauness of DE819 since start is: " << hLandauCycle->GetBinContent(820) << std::endl;
+        std::cout << "MPV of DE819 is: " << hLandauCycle->GetBinContent(820) << std::endl;
     }
     
     
@@ -1428,7 +1433,9 @@ void PhysicsTask::endOfCycle()
       for(auto& h : mHistogramClchgDEOnCycle) {
         if (h.second != nullptr) {
           h.second->Write();
-            h.second->Reset();
+            if(numCyclesQC % 4 == 0){ // On fit la Landau tous les 4 cycles
+                h.second->Reset();
+            }
         }
       }
     }
