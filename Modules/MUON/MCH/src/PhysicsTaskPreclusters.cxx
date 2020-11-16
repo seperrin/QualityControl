@@ -8,7 +8,6 @@
 
 #include <TCanvas.h>
 #include <TH1.h>
-#include <TF1.h>
 #include <TH2.h>
 #include <TFile.h>
 #include <algorithm>
@@ -72,17 +71,17 @@ void PhysicsTaskPreclusters::initialize(o2::framework::InitContext& /*ctx*/)
     // Histograms using the XY Mapping
 
     {
-      TH2F* hXY = new TH2F(TString::Format("QcMuonChambers_Preclusters_Number_XY_%03d", de),
-                           TString::Format("QcMuonChambers - Preclusters Number XY (DE%03d B)", de), Xsize / scale, -Xsize2, Xsize2, Ysize / scale, -Ysize2, Ysize2);
+      TH2F* hXY = new TH2F(TString::Format("QcMuonChambers_Preclusters_NBgood_XY_%03d", de),
+                           TString::Format("QcMuonChambers - Preclusters XY (DE%03d NB, good)", de), Xsize / scale, -Xsize2, Xsize2, Ysize / scale, -Ysize2, Ysize2);
       mHistogramPreclustersXY[0].insert(make_pair(de, hXY));
+      hXY = new TH2F(TString::Format("QcMuonChambers_Preclusters_Bgood_XY_%03d", de),
+                     TString::Format("QcMuonChambers - Preclusters XY (DE%03d B, good)", de), Xsize / scale, -Xsize2, Xsize2, Ysize / scale, -Ysize2, Ysize2);
+      mHistogramPreclustersXY[1].insert(make_pair(de, hXY));
       hXY = new TH2F(TString::Format("QcMuonChambers_Preclusters_B_XY_%03d", de),
                      TString::Format("QcMuonChambers - Preclusters XY (DE%03d B)", de), Xsize / scale, -Xsize2, Xsize2, Ysize / scale, -Ysize2, Ysize2);
-      mHistogramPreclustersXY[1].insert(make_pair(de, hXY));
+      mHistogramPreclustersXY[2].insert(make_pair(de, hXY));
       hXY = new TH2F(TString::Format("QcMuonChambers_Preclusters_NB_XY_%03d", de),
                      TString::Format("QcMuonChambers - Preclusters XY (DE%03d NB)", de), Xsize / scale, -Xsize2, Xsize2, Ysize / scale, -Ysize2, Ysize2);
-      mHistogramPreclustersXY[2].insert(make_pair(de, hXY));
-      hXY = new TH2F(TString::Format("QcMuonChambers_Preclusters_BNB_XY_%03d", de),
-                     TString::Format("QcMuonChambers - Preclusters XY (DE%03d B+NB)", de), Xsize / scale, -Xsize2, Xsize2, Ysize / scale, -Ysize2, Ysize2);
       mHistogramPreclustersXY[3].insert(make_pair(de, hXY));
       hXY = new TH2F(TString::Format("QcMuonChambers_Pseudoeff_B_XY_%03d", de),
                      TString::Format("QcMuonChambers - Pseudo-efficiency XY (DE%03d B)", de), Xsize / scale, -Xsize2, Xsize2, Ysize / scale, -Ysize2, Ysize2);
@@ -122,6 +121,7 @@ void PhysicsTaskPreclusters::startOfCycle()
 
 void PhysicsTaskPreclusters::monitorData(o2::framework::ProcessingContext& ctx)
 {
+  bool verbose = false;
   // get the input preclusters and associated digits
   auto preClusters = ctx.inputs().get<gsl::span<o2::mch::PreCluster>>("preclusters");
   auto digits = ctx.inputs().get<gsl::span<o2::mch::Digit>>("preclusterdigits");
@@ -133,7 +133,7 @@ void PhysicsTaskPreclusters::monitorData(o2::framework::ProcessingContext& ctx)
     }
   }
 
-  if (print) {
+  if (print && verbose) {
     printPreclusters(preClusters, digits);
   }
 }
@@ -243,6 +243,7 @@ bool PhysicsTaskPreclusters::plotPrecluster(const o2::mch::PreCluster& preCluste
   bool cathode[2] = { false, false };
   float chargeSum[2] = { 0, 0 };
   float chargeMax[2] = { 0, 0 };
+  int multiplicity[2] = { 0, 0 };
 
   int detid = preClusterDigits[0].getDetID();
   const o2::mch::mapping::Segmentation& segment = o2::mch::mapping::segmentation(detid);
@@ -255,6 +256,7 @@ bool PhysicsTaskPreclusters::plotPrecluster(const o2::mch::PreCluster& preCluste
     int cid = segment.isBendingPad(padid) ? 0 : 1;
     cathode[cid] = true;
     chargeSum[cid] += digit.getADC();
+    multiplicity[cid] += 1;
 
     if (digit.getADC() > chargeMax[cid]) {
       chargeMax[cid] = digit.getADC();
@@ -277,6 +279,8 @@ bool PhysicsTaskPreclusters::plotPrecluster(const o2::mch::PreCluster& preCluste
     return true;
   }
 
+  bool isGood[2] = {(chargeMax[0] > 100) && (multiplicity[0] > 1), (chargeMax[1] > 100) && (multiplicity[1] > 1)};
+
   double Xcog, Ycog;
   bool isWide[2];
   CoG(preClusterDigits, Xcog, Ycog, isWide);
@@ -284,32 +288,29 @@ bool PhysicsTaskPreclusters::plotPrecluster(const o2::mch::PreCluster& preCluste
   // Filling histograms to be used for Pseudo-efficiency computation
 
   // All meaningful preclusters (the breakdown is done in the histograms below)
-  if ((cathode[0] && isWide[0]) || (cathode[1] && isWide[1]) || (cathode[0] && cathode[1])) {
+  if (isGood[1]) {
     auto hXY0 = mHistogramPreclustersXY[0].find(detid);
     if ((hXY0 != mHistogramPreclustersXY[0].end()) && (hXY0->second != NULL)) {
       hXY0->second->Fill(Xcog, Ycog);
     }
+    if (cathode[0]) {
+      auto hXY1 = mHistogramPreclustersXY[2].find(detid);
+      if ((hXY1 != mHistogramPreclustersXY[2].end()) && (hXY1->second != NULL)) {
+        hXY1->second->Fill(Xcog, Ycog);
+      }
+    }
   }
 
-  // Wide clusters on bending side (because mono-cathode preclusters need to be wide to have a meaningful position in both x and y)
-  if (cathode[0] && isWide[0]) {
-    auto hXY1 = mHistogramPreclustersXY[1].find(detid);
-    if ((hXY1 != mHistogramPreclustersXY[1].end()) && (hXY1->second != NULL)) {
-      hXY1->second->Fill(Xcog, Ycog);
+  if (isGood[0]) {
+    auto hXY0 = mHistogramPreclustersXY[1].find(detid);
+    if ((hXY0 != mHistogramPreclustersXY[1].end()) && (hXY0->second != NULL)) {
+      hXY0->second->Fill(Xcog, Ycog);
     }
-  }
-  // Similarly on non-bending
-  if (cathode[1] && isWide[1]) {
-    auto hXY1 = mHistogramPreclustersXY[2].find(detid);
-    if ((hXY1 != mHistogramPreclustersXY[2].end()) && (hXY1->second != NULL)) {
-      hXY1->second->Fill(Xcog, Ycog);
-    }
-  }
-  // Clusters on both bending and non-bending (no need to require them to be wide because having both cathodes fired is sufficient to give x and y with enough precision)
-  if (cathode[0] && cathode[1]) {
-    auto hXY1 = mHistogramPreclustersXY[3].find(detid);
-    if ((hXY1 != mHistogramPreclustersXY[3].end()) && (hXY1->second != NULL)) {
-      hXY1->second->Fill(Xcog, Ycog);
+    if (cathode[1]) {
+      auto hXY1 = mHistogramPreclustersXY[3].find(detid);
+      if ((hXY1 != mHistogramPreclustersXY[3].end()) && (hXY1->second != NULL)) {
+        hXY1->second->Fill(Xcog, Ycog);
+      }
     }
   }
 
@@ -346,7 +347,9 @@ void PhysicsTaskPreclusters::printPreclusters(gsl::span<const o2::mch::PreCluste
     bool isWide[2];
     CoG(preClusterDigits, Xcog, Ycog, isWide);
 
-    QcInfoLogger::GetInstance() << "[pre-cluster] charge = " << chargeSum[0] << " " << chargeSum[1] << "   CoG = " << Xcog << " " << AliceO2::InfoLogger::InfoLogger::endm;
+    QcInfoLogger::GetInstance() << "\n\n\n====================\n" <<
+        "[pre-cluster] charge = " << chargeSum[0] << " " << chargeSum[1] << "   CoG = " << Xcog << "," << Ycog <<
+        AliceO2::InfoLogger::InfoLogger::endm;
     for (auto& d : preClusterDigits) {
       float X = segment.padPositionX(d.getPadID());
       float Y = segment.padPositionY(d.getPadID());
@@ -356,6 +359,7 @@ void PhysicsTaskPreclusters::printPreclusters(gsl::span<const o2::mch::PreCluste
                                   << "\n"
                                   << fmt::format("  CATHODE {}  PAD_XY {:+2.2f} , {:+2.2f}", (int)bend, X, Y) << AliceO2::InfoLogger::InfoLogger::endm;
     }
+    QcInfoLogger::GetInstance() << "\n====================\n\n" << AliceO2::InfoLogger::InfoLogger::endm;
   }
 }
 
@@ -363,9 +367,9 @@ void PhysicsTaskPreclusters::endOfCycle()
 {
   QcInfoLogger::GetInstance() << "endOfCycle" << AliceO2::InfoLogger::InfoLogger::endm;
   for (int de = 100; de <= 1030; de++) {
-    for (int i = 0; i < 3; i++) {
-      auto ih = mHistogramPreclustersXY[i + 1].find(de);
-      if (ih == mHistogramPreclustersXY[i + 1].end()) {
+    for (int i = 0; i < 2; i++) {
+      auto ih = mHistogramPreclustersXY[i + 2].find(de);
+      if (ih == mHistogramPreclustersXY[i + 2].end()) {
         continue;
       }
       // Getting the histogram with the clusters positions exists (either on B, NB, or B and NB)
@@ -375,8 +379,8 @@ void PhysicsTaskPreclusters::endOfCycle()
       }
 
       // Getting the histogram with all the preclusters (denominator of pseudo-efficiency)
-      ih = mHistogramPreclustersXY[0].find(de);
-      if (ih == mHistogramPreclustersXY[0].end()) {
+      ih = mHistogramPreclustersXY[i].find(de);
+      if (ih == mHistogramPreclustersXY[i].end()) {
         continue;
       }
       TH2F* hAll = ih->second;
@@ -464,6 +468,13 @@ void PhysicsTaskPreclusters::endOfActivity(Activity& /*activity*/)
   {
     for (int i = 0; i < 4; i++) {
       for (auto& h2 : mHistogramPreclustersXY[i]) {
+        if (h2.second != nullptr) {
+          h2.second->Write();
+        }
+      }
+    }
+    for (int i = 0; i < 3; i++) {
+      for (auto& h2 : mHistogramPseudoeffXY[i]) {
         if (h2.second != nullptr) {
           h2.second->Write();
         }
