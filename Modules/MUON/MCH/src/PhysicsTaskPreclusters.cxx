@@ -27,7 +27,7 @@ using namespace std;
 using namespace o2::mch::raw;
 using namespace o2::quality_control::core;
 
-// #define QC_MCH_SAVE_TEMP_ROOTFILE 1
+#define QC_MCH_SAVE_TEMP_ROOTFILE 1
 
 namespace o2
 {
@@ -121,7 +121,7 @@ void PhysicsTaskPreclusters::startOfCycle()
 
 void PhysicsTaskPreclusters::monitorData(o2::framework::ProcessingContext& ctx)
 {
-  bool verbose = false;
+  bool verbose = true;
   // get the input preclusters and associated digits
   auto preClusters = ctx.inputs().get<gsl::span<o2::mch::PreCluster>>("preclusters");
   auto digits = ctx.inputs().get<gsl::span<o2::mch::Digit>>("preclusterdigits");
@@ -133,6 +133,7 @@ void PhysicsTaskPreclusters::monitorData(o2::framework::ProcessingContext& ctx)
     }
   }
 
+  print = true;
   if (print && verbose) {
     printPreclusters(preClusters, digits);
   }
@@ -456,7 +457,7 @@ void PhysicsTaskPreclusters::endOfActivity(Activity& /*activity*/)
   QcInfoLogger::GetInstance() << "endOfActivity" << AliceO2::InfoLogger::InfoLogger::endm;
 
 #ifdef QC_MCH_SAVE_TEMP_ROOTFILE
-  TFile f("/tmp/qc.root", "RECREATE");
+  TFile f("/tmp/qc-preclusters.root", "RECREATE");
 
   {
     auto hMean = mMeanPseudoeffPerDE;
