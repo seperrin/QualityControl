@@ -121,7 +121,7 @@ void PhysicsTaskPreclusters::startOfCycle()
 
 void PhysicsTaskPreclusters::monitorData(o2::framework::ProcessingContext& ctx)
 {
-  bool verbose = true;
+  bool verbose = false;
   // get the input preclusters and associated digits
   auto preClusters = ctx.inputs().get<gsl::span<o2::mch::PreCluster>>("preclusters");
   auto digits = ctx.inputs().get<gsl::span<o2::mch::Digit>>("preclusterdigits");
@@ -133,7 +133,6 @@ void PhysicsTaskPreclusters::monitorData(o2::framework::ProcessingContext& ctx)
     }
   }
 
-  print = true;
   if (print && verbose) {
     printPreclusters(preClusters, digits);
   }
