@@ -15,7 +15,6 @@
 ///
 
 #include "QualityControl/TaskInterface.h"
-#include "QualityControl/QcInfoLogger.h"
 #include <CCDB/CcdbApi.h>
 
 using namespace o2::ccdb;
@@ -44,7 +43,7 @@ void TaskInterface::loadCcdb(std::string url)
 
   mCcdbApi->init(url);
   if (!mCcdbApi->isHostReachable()) {
-    ILOG(Warning) << "CCDB at URL '" << url << "' is not reachable." << ENDM;
+    ILOG(Warning, Support) << "CCDB at URL '" << url << "' is not reachable." << ENDM;
   }
 }
 
@@ -58,11 +57,16 @@ TObject* TaskInterface::retrieveCondition(std::string path, std::map<std::string
   if (mCcdbApi) {
     return mCcdbApi->retrieve(path, metadata, timestamp);
   } else {
-    ILOG(Error) << "Trying to retrieve a condition, but CCDB API is not constructed." << ENDM;
+    ILOG(Error, Support) << "Trying to retrieve a condition, but CCDB API is not constructed." << ENDM;
     return nullptr;
   }
 }
 
 std::shared_ptr<ObjectsManager> TaskInterface::getObjectsManager() { return mObjectsManager; }
+
+void TaskInterface::setMonitoring(const std::shared_ptr<o2::monitoring::Monitoring>& mMonitoring)
+{
+  TaskInterface::mMonitoring = mMonitoring;
+}
 
 } // namespace o2::quality_control::core

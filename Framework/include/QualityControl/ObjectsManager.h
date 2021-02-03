@@ -43,10 +43,13 @@ class ObjectsManager
  public:
   /**
    * Constructor
-   * @param taskConfig The configuration of the task for which we are building this object manager
+   * @param taskName Task name
+   * @param detectorName Detector 3-letter code
+   * @param consulUrl Consul URL, for the service discovery
+   * @param parallelTaskID ID of a parallel Task, use 0 if there is only one.
    * @param noDiscovery If true disables the use of ServiceDiscovery
    */
-  explicit ObjectsManager(TaskConfig& taskConfig, bool noDiscovery = false);
+  ObjectsManager(std::string taskName, std::string detectorName, std::string consulUrl, int parallelTaskID = 0, bool noDiscovery = false);
   virtual ~ObjectsManager();
 
   static const std::string gDrawOptionsKey;
@@ -137,7 +140,15 @@ class ObjectsManager
    * Get the number of objects that have been published.
    * @return an int with the number of objects.
    */
-  int getNumberPublishedObjects();
+  size_t getNumberPublishedObjects();
+
+  /**
+   * Returns the published MonitorObject specified by its name
+   * @param index
+   * @return A pointer to the MonitorObject.
+   * @throw ObjectNotFoundError if the object is not found.
+   */
+  MonitorObject* getMonitorObject(size_t index);
 
   /**
    * \brief Update the list of objects stored in the Service Discovery.
@@ -154,7 +165,8 @@ class ObjectsManager
 
  private:
   std::unique_ptr<MonitorObjectCollection> mMonitorObjects;
-  TaskConfig& mTaskConfig;
+  std::string mTaskName;
+  std::string mDetectorName;
   std::unique_ptr<ServiceDiscovery> mServiceDiscovery;
   bool mUpdateServiceDiscovery;
 };

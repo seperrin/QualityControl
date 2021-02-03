@@ -19,7 +19,6 @@
 #include "QualityControl/MonitorObject.h"
 #include "QualityControl/Reductor.h"
 #include "QualityControl/RootClassFactory.h"
-#include <Configuration/ConfigurationInterface.h>
 #include <boost/property_tree/ptree.hpp>
 #include <TH1.h>
 #include <TCanvas.h>
@@ -49,41 +48,26 @@ void TrendingTask::initialize(Trigger, framework::ServiceRegistry&)
     mTrend->Branch(source.name.c_str(), reductor->getBranchAddress(), reductor->getBranchLeafList());
     mReductors[source.name] = std::move(reductor);
   }
+  getObjectsManager()->startPublishing(mTrend.get());
 }
 
 //todo: see if OptimizeBaskets() indeed helps after some time
-void TrendingTask::update(Trigger, framework::ServiceRegistry& services)
+void TrendingTask::update(Trigger t, framework::ServiceRegistry& services)
 {
   auto& qcdb = services.get<repository::DatabaseInterface>();
 
-  trendValues(qcdb);
-
-  storePlots(qcdb);
-  storeTrend(qcdb);
+  trendValues(t.timestamp, qcdb);
+  generatePlots();
 }
 
-void TrendingTask::finalize(Trigger, framework::ServiceRegistry& services)
+void TrendingTask::finalize(Trigger, framework::ServiceRegistry&)
 {
-  auto& qcdb = services.get<repository::DatabaseInterface>();
-
-  storePlots(qcdb);
-  storeTrend(qcdb);
+  generatePlots();
 }
 
-void TrendingTask::storeTrend(repository::DatabaseInterface& qcdb)
+void TrendingTask::trendValues(uint64_t timestamp, repository::DatabaseInterface& qcdb)
 {
-  ILOG(Info) << "Storing the trend, entries: " << mTrend->GetEntries() << ENDM;
-
-  auto mo = std::make_shared<core::MonitorObject>(mTrend.get(), getName(), mConfig.detectorName);
-  mo->setIsOwner(false);
-  qcdb.storeMO(mo);
-}
-
-void TrendingTask::trendValues(repository::DatabaseInterface& qcdb)
-{
-  // We use current date and time. This for planned processing (not history). We still might need to use the objects
-  // timestamps in the end, but this would become ambiguous if there is more than one data source.
-  mTime = TDatime().Convert();
+  mTime = timestamp / 1000; // ROOT expects seconds since epoch
   // todo get run number when it is available. consider putting it inside monitor object's metadata (this might be not
   //  enough if we trend across runs).
   mMetaData.runNumber = -1;
@@ -92,30 +76,41 @@ void TrendingTask::trendValues(repository::DatabaseInterface& qcdb)
 
     // todo: make it agnostic to MOs, QOs or other objects. Let the reductor cast to whatever it needs.
     if (dataSource.type == "repository") {
-      auto mo = qcdb.retrieveMO(dataSource.path, dataSource.name);
+      auto mo = qcdb.retrieveMO(dataSource.path, dataSource.name, timestamp);
       TObject* obj = mo ? mo->getObject() : nullptr;
       if (obj) {
         mReductors[dataSource.name]->update(obj);
       }
     } else if (dataSource.type == "repository-quality") {
-      auto qo = qcdb.retrieveQO(dataSource.path + "/" + dataSource.name);
+      auto qo = qcdb.retrieveQO(dataSource.path + "/" + dataSource.name, timestamp);
       if (qo) {
         mReductors[dataSource.name]->update(qo.get());
       }
     } else {
-      ILOGE << "Unknown type of data source '" << dataSource.type << "'.";
+      ILOG(Error, Support) << "Unknown type of data source '" << dataSource.type << "'." << ENDM;
     }
   }
 
   mTrend->Fill();
 }
 
-void TrendingTask::storePlots(repository::DatabaseInterface& qcdb)
+void TrendingTask::generatePlots()
 {
-  ILOG(Info) << "Generating and storing " << mConfig.plots.size() << " plots." << ENDM;
+  if (mTrend->GetEntries() < 1) {
+    ILOG(Info, Support) << "No entries in the trend so far, won't generate any plots." << ENDM;
+    return;
+  }
 
-  // why generate and store plots in the same function? because it is easier to handle the lifetime of pointers to the ROOT objects
+  ILOG(Info, Support) << "Generating " << mConfig.plots.size() << " plots." << ENDM;
+
   for (const auto& plot : mConfig.plots) {
+
+    // Before we generate any new plots, we have to delete existing under the same names.
+    // It seems that ROOT cannot handle an existence of two canvases with a common name in the same process.
+    if (mPlots.count(plot.name)) {
+      getObjectsManager()->stopPublishing(plot.name);
+      delete mPlots[plot.name];
+    }
 
     // we determine the order of the plot, i.e. if it is a histogram (1), graph (2), or any higher dimension.
     const size_t plotOrder = std::count(plot.varexp.begin(), plot.varexp.end(), ':') + 1;
@@ -132,7 +127,7 @@ void TrendingTask::storePlots(repository::DatabaseInterface& qcdb)
     // For graphs we allow to draw errors if they are specified.
     if (!plot.graphErrors.empty()) {
       if (plotOrder != 2) {
-        ILOG(Error) << "Non empty graphErrors seen for the plot '" << plot.name << "', which is not a graph, ignoring." << ENDM;
+        ILOG(Error, Support) << "Non empty graphErrors seen for the plot '" << plot.name << "', which is not a graph, ignoring." << ENDM;
       } else {
         // We generate some 4-D points, where 2 dimensions represent graph points and 2 others are the error bars
         std::string varexpWithErrors(plot.varexp + ":" + plot.graphErrors);
@@ -140,6 +135,12 @@ void TrendingTask::storePlots(repository::DatabaseInterface& qcdb)
         graphErrors = new TGraphErrors(mTrend->GetSelectedRows(), mTrend->GetVal(1), mTrend->GetVal(0), mTrend->GetVal(2), mTrend->GetVal(3));
         // We draw on the same plot as the main graph, but only error bars
         graphErrors->Draw("SAME E");
+        // We try to convince ROOT to delete graphErrors together with the rest of the canvas.
+        if (auto* pad = c->GetPad(0)) {
+          if (auto* primitives = pad->GetListOfPrimitives()) {
+            primitives->Add(graphErrors);
+          }
+        }
       }
     }
 
@@ -157,7 +158,7 @@ void TrendingTask::storePlots(repository::DatabaseInterface& qcdb)
         // It will have an effect only after invoking Draw again.
         title->Draw();
       } else {
-        ILOG(Error) << "Could not get the title TPaveText of the plot '" << plot.name << "'." << ENDM;
+        ILOG(Error, Devel) << "Could not get the title TPaveText of the plot '" << plot.name << "'." << ENDM;
       }
 
       // We have to explicitly configure showing time on x axis.
@@ -174,16 +175,10 @@ void TrendingTask::storePlots(repository::DatabaseInterface& qcdb)
       // so we have to do it here.
       histo->BufferEmpty();
     } else {
-      ILOG(Error) << "Could not get the htemp histogram of the plot '" << plot.name << "'." << ENDM;
+      ILOG(Error, Devel) << "Could not get the htemp histogram of the plot '" << plot.name << "'." << ENDM;
     }
 
-    auto mo = std::make_shared<MonitorObject>(c, mConfig.taskName, mConfig.detectorName);
-    mo->setIsOwner(false);
-    qcdb.storeMO(mo);
-
-    // It should delete everything inside. Confirmed by trying to delete histo after and getting a segfault.
-    delete c;
-    // ...but it does not delete graphErrors
-    delete graphErrors;
+    mPlots[plot.name] = c;
+    getObjectsManager()->startPublishing(c);
   }
 }

@@ -31,17 +31,18 @@ namespace o2::quality_control::core
 const std::string ObjectsManager::gDrawOptionsKey = "drawOptions";
 const std::string ObjectsManager::gDisplayHintsKey = "displayHints";
 
-ObjectsManager::ObjectsManager(TaskConfig& taskConfig, bool noDiscovery) : mTaskConfig(taskConfig), mUpdateServiceDiscovery(false)
+ObjectsManager::ObjectsManager(std::string taskName, std::string detectorName, std::string consulUrl, int parallelTaskID, bool noDiscovery)
+  : mTaskName(taskName), mDetectorName(detectorName), mUpdateServiceDiscovery(false)
 {
   mMonitorObjects = std::make_unique<MonitorObjectCollection>();
   mMonitorObjects->SetOwner(true);
 
   // register with the discovery service
   if (!noDiscovery) {
-    std::string uniqueTaskID = taskConfig.taskName + "_" + std::to_string(mTaskConfig.parallelTaskID);
-    mServiceDiscovery = std::make_unique<ServiceDiscovery>(taskConfig.consulUrl, taskConfig.taskName, uniqueTaskID);
+    std::string uniqueTaskID = taskName + "_" + std::to_string(parallelTaskID);
+    mServiceDiscovery = std::make_unique<ServiceDiscovery>(consulUrl, taskName, uniqueTaskID);
   } else {
-    ILOG(Info) << "Service Discovery disabled" << ENDM;
+    ILOG(Warning, Ops) << "Service Discovery disabled" << ENDM;
     mServiceDiscovery = nullptr;
   }
 }
@@ -51,10 +52,10 @@ ObjectsManager::~ObjectsManager() = default;
 void ObjectsManager::startPublishing(TObject* object)
 {
   if (mMonitorObjects->FindObject(object->GetName()) != 0) {
-    ILOG(Warning) << "Object already being published (" << object->GetName() << ")" << ENDM;
+    ILOG(Warning, Support) << "Object is already being published (" << object->GetName() << ")" << ENDM;
     BOOST_THROW_EXCEPTION(DuplicateObjectError() << errinfo_object_name(object->GetName()));
   }
-  auto* newObject = new MonitorObject(object, mTaskConfig.taskName, mTaskConfig.detectorName);
+  auto* newObject = new MonitorObject(object, mTaskName, mDetectorName);
   newObject->setIsOwner(false);
   mMonitorObjects->Add(newObject);
   mUpdateServiceDiscovery = true;
@@ -105,8 +106,19 @@ MonitorObject* ObjectsManager::getMonitorObject(std::string objectName)
 {
   TObject* object = mMonitorObjects->FindObject(objectName.c_str());
   if (object == nullptr) {
-    ILOG(Error) << "ObjectsManager: Unable to find object \"" << objectName << "\"" << ENDM;
+    ILOG(Error, Ops) << "ObjectsManager: Unable to find object \"" << objectName << "\"" << ENDM;
     BOOST_THROW_EXCEPTION(ObjectNotFoundError() << errinfo_object_name(objectName));
+  }
+  return dynamic_cast<MonitorObject*>(object);
+}
+
+MonitorObject* ObjectsManager::getMonitorObject(size_t index)
+{
+  TObject* object = mMonitorObjects->At(index);
+  if (object == nullptr) {
+    ILOG(Error, Ops) << "ObjectsManager: Unable to find object at index \"" << index << "\"" << ENDM;
+    string fakeName = "at index " + to_string(index);
+    BOOST_THROW_EXCEPTION(ObjectNotFoundError() << errinfo_object_name(fakeName));
   }
   return dynamic_cast<MonitorObject*>(object);
 }
@@ -120,10 +132,10 @@ void ObjectsManager::addMetadata(const std::string& objectName, const std::strin
 {
   MonitorObject* mo = getMonitorObject(objectName);
   mo->addMetadata(key, value);
-  ILOG(Info) << "Added metadata on " << objectName << " : " << key << " -> " << value << ENDM;
+  ILOG(Debug, Devel) << "Added metadata on " << objectName << " : " << key << " -> " << value << ENDM;
 }
 
-int ObjectsManager::getNumberPublishedObjects()
+size_t ObjectsManager::getNumberPublishedObjects()
 {
   return mMonitorObjects->GetLast() + 1; // GetLast returns the index
 }

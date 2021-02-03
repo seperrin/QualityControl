@@ -5,6 +5,7 @@ here. It is not sanitized or organized. Just a brain dump.
 
 ### Release procedure / check list
 1. Update the version number in [CMakeLists.txt](../CMakeLists.txt), commit and push
+2. Release in JIRA
 2. Prepare the release notes using the commits since the last release in github (see [this template](ReleaseNotesTemplate.md)).
 3. Release in github, paste the release notes
 4. A PR is automatically created in alidist
@@ -13,12 +14,12 @@ here. It is not sanitized or organized. Just a brain dump.
 ### Create a fix version
 1. checkout last tagged version, e.g. `git checkout v0.26.1`
 2. branch, e.g. `git checkout -b branch_v0.26.2`
-2. push the branch upstream, e.g. `git push upstream -u branch_v0.26.2`
 2. cherry-pick the commit from master, e.g. `git cherry-pick b187ddbe52058d53a9bbf3cbdd53121c6b936cd8`
 3. change version in CMakeLists and commit
+2. push the branch upstream, e.g. `git push upstream -u branch_v0.26.2`
 5. tag, e.g. `git tag -a v0.26.2 -m "v0.26.2"`
 4. push the tag upstream, e.g. `git push upstream v0.26.2`
-6. Release in github
+6. Release in github using this tag 
 4. A PR is automatically created in alidist
 
 ### Where and how to configure the repo_cleaner of the ccdb-test
@@ -26,6 +27,8 @@ here. It is not sanitized or organized. Just a brain dump.
 The config file is stored in git in the branch `repo_cleaner` (careful not to update in master instead !). Check out the branch, update the file Framework/script/RepoCleaner/config.yaml and commit it. A PR is necessary but in case of emergency, force-merge it. As soon as it is merged, it will be used by the script.
 
 The config file used to be in `aldaqci@aidrefflp01:~/alice-ccdb/config.yaml` but it is not the case any more.
+
+The different cleaning policies available at the moment are: 1_per_hour, 1_per_run, last_only, none_kept, skip
 
 The repo_cleaner is launched every 5 minutes by [Jenkins](https://alijenkins.cern.ch/job/FLP/job/CCDB%20Clean%20up/).
 
@@ -70,8 +73,10 @@ When we don't see the monitoring data in grafana, here is what to do to pinpoint
     
 ### Monitoring setup for building the grafana dashboard
 
-Ask Adam for an account on pcald03.cern.ch:3000.
-Set the monitoring url to `"url": "influxdb-udp://flptest2.cern.ch:8089"`
+1. Ask Adam for an account on pcald03.cern.ch:3000.
+3. Ask Adam for a copy of the QC dashboard that you can edit. 
+2. Set the monitoring url to `"url": "influxdb-udp://flptest2.cern.ch:8089"`
+4. Once the dashboard is ready, tell Adam. 
 
 ### Avoid writing QC objects to a repository
 
@@ -132,8 +137,40 @@ What are the QC integration tests in the FLP Pipeline doing?
 Those object names are configurable from Ansible so that we do not have to release a new QCG rpm if we need to update the objects we check. So, if you know something will change 
 modify the following file: https://gitlab.cern.ch/AliceO2Group/system-configuration/-/blob/dev/ansible/roles/flp-deployment-checks/templates/qcg-test-config.js.j2
 
+If this test fail and one wants to investigate, they should first resume the VM in openstack. Then the normal web interfaces are available. 
+
 ### Check the logs of the QCG
 
 ```
 journalctl -u o2-qcg
+```
+
+### Deploy a modified version of the ansible recipes
+
+When working on the ansible recipes and deploying with o2-flp-setup, the recipes to modify are in 
+`.local/share/o2-flp-setup/system-configuration/`. 
+
+### Test with STFBuilder
+https://alice.its.cern.ch/jira/browse/O2-169
+```
+readout.exe file:///afs/cern.ch/user/b/bvonhall/dev/alice/sw/slc7_x86-64/DataDistribution/latest/config/readout_emu.cfg
+ 
+StfBuilder \
+	--id stf_builder-0 \
+	--transport shmem \
+	--detector TPC \
+	--dpl-channel-name=dpl-chan \
+	--channel-config "name=dpl-chan,type=push,method=bind,address=ipc:///tmp/stf-builder-dpl-pipe-0,transport=shmem,rateLogging=1" \
+	--channel-config "name=readout,type=pull,method=connect,address=ipc:///tmp/readout-pipe-0,transport=shmem,rateLogging=1"
+        --detector-rdh=4
+ 
+o2-dpl-raw-proxy \
+      -b \
+      --session default \
+      --dataspec "B:TPC/RAWDATA" \
+      --channel-config "name=readout-proxy,type=pull,method=connect,address=ipc:///tmp/stf-builder-dpl-pipe-0,transport=shmem,rateLogging=1" \
+ | o2-qc \
+      --config json://$PWD/datadistribution.json \
+      -b \
+      --session default
 ```
