@@ -58,7 +58,8 @@ struct DualSampa {
   int ndata[2][32];
   int nclus[2][32];
   double pedestal[2][32], noise[2][32];
-  int32_t min[2][32], max[2][32], delta[2][32];
+  uint32_t min[2][32], max[2][32];
+  int32_t delta[2][32];
   SampaHit hit;
 };
 

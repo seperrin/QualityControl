@@ -435,7 +435,7 @@ void PhysicsTaskDigits::plotDigit(const o2::mch::Digit& digit)
         std::cout << "mHistogramNHitsElec->GetBinContent(xbin, ybin) BEFORE : " << mHistogramNHitsElec->GetBinContent(xbin, ybin) << std::endl;
     }
     
-    int bin_number = mHistogramNHitsElec->GetBin(xbin, ybin, 1);
+    //int bin_number = mHistogramNHitsElec->GetBin(xbin, ybin, 1);
     int x_center = mHistogramNHitsElec->GetXaxis()->GetBinCenter(xbin);
     int y_center = mHistogramNHitsElec->GetXaxis()->GetBinCenter(ybin);
     mHistogramNHitsElec->Fill(x_center, y_center, 1);
@@ -747,7 +747,7 @@ void PhysicsTaskDigits::endOfCycle()
                   uint32_t ds_addr =  (binx%40)-1;
                   uint32_t linkid = ( (binx-1-ds_addr) / 40 ) % 12;
                   uint32_t fee_id = (binx-1-ds_addr-40*linkid) / (12*40);
-                  uint32_t chan_addr = biny-1;
+                  //uint32_t chan_addr = biny-1;
                   uint32_t de;
                   uint32_t dsid;
                   int32_t link_id = mDecoder.getMapCRU(fee_id, linkid);
@@ -792,7 +792,7 @@ void PhysicsTaskDigits::endOfCycle()
                   uint32_t ds_addr =  (binx%40)-1;
                   uint32_t linkid = ( (binx-1-ds_addr) / 40 ) % 12;
                   uint32_t fee_id = (binx-1-ds_addr-40*linkid) / (12*40);
-                  uint32_t chan_addr = biny-1;
+                  //uint32_t chan_addr = biny-1;
                   uint32_t de;
                   uint32_t dsid;
                   int32_t link_id = mDecoder.getMapCRU(fee_id, linkid);

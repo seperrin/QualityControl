@@ -275,7 +275,7 @@ static void CoG(gsl::span<const o2::mch::Digit> precluster, double& Xcog, double
   int detid = precluster[0].getDetID();
   const o2::mch::mapping::Segmentation& segment = o2::mch::mapping::segmentation(detid);
 
-  for ( size_t i = 0; i < precluster.size(); ++i ) {
+  for ( ssize_t i = 0; i < precluster.size(); ++i ) {
     const o2::mch::Digit& digit = precluster[i];
     int padid = digit.getPadID();
 
@@ -351,7 +351,7 @@ void PhysicsTaskPreClusters::checkPreclusters(gsl::span<const o2::mch::PreCluste
       int detid = preClusterDigits[0].getDetID();
       const o2::mch::mapping::Segmentation& segment = o2::mch::mapping::segmentation(detid);
 
-      for ( size_t i = 0; i < preClusterDigits.size(); ++i ) {
+      for ( ssize_t i = 0; i < preClusterDigits.size(); ++i ) {
         const o2::mch::Digit& digit = preClusterDigits[i];
         int padid = digit.getPadID();
 
@@ -408,20 +408,20 @@ void PhysicsTaskPreClusters::printPreclusters(gsl::span<const o2::mch::PreCluste
     // get the digits of this precluster
     auto preClusterDigits = digits.subspan(preCluster.firstDigit, preCluster.nDigits);
 
-    bool cathode[2] = {false, false};
+    //bool cathode[2] = {false, false};
     float chargeSum[2] = {0, 0};
     float chargeMax[2] = {0, 0};
 
     int detid = preClusterDigits[0].getDetID();
     const o2::mch::mapping::Segmentation& segment = o2::mch::mapping::segmentation(detid);
 
-    for ( size_t i = 0; i < preClusterDigits.size(); ++i ) {
+    for ( ssize_t i = 0; i < preClusterDigits.size(); ++i ) {
       const o2::mch::Digit& digit = preClusterDigits[i];
       int padid = digit.getPadID();
 
       // cathode index
       int cid = segment.isBendingPad(padid) ? 0 : 1;
-      cathode[cid] = true;
+      //cathode[cid] = true;
       chargeSum[cid] += digit.getADC();
 
       if (digit.getADC() > chargeMax[cid]) {
@@ -458,7 +458,7 @@ bool PhysicsTaskPreClusters::plotPrecluster(const o2::mch::PreCluster& preCluste
   int detid = preClusterDigits[0].getDetID();
   const o2::mch::mapping::Segmentation& segment = o2::mch::mapping::segmentation(detid);
 
-  for ( size_t i = 0; i < preClusterDigits.size(); ++i ) {
+  for ( ssize_t i = 0; i < preClusterDigits.size(); ++i ) {
     const o2::mch::Digit& digit = preClusterDigits[i];
     int padid = digit.getPadID();
 
@@ -520,7 +520,7 @@ bool PhysicsTaskPreClusters::plotPrecluster(const o2::mch::PreCluster& preCluste
     hXY0->second->Fill(Xcog, Ycog);
   }
 
-  int hid = 1;
+  //int hid = 1;
   if(cathode[0]) {
     auto hXY1 = mHistogramPreclustersXY[1].find(detid);
     if ((hXY1 != mHistogramPreclustersXY[1].end()) && (hXY1->second != NULL)) {
@@ -597,7 +597,7 @@ void PhysicsTaskPreClusters::endOfCycle()
       //mHistogramADCamplitude[i]->Write();
     }
     //std::cout<<"mHistogramADCamplitudeDE.size() = "<<mHistogramADCamplitudeDE.size()<<"  DEs.size()="<<DEs.size()<<std::endl;
-    int nbDEs = DEs.size();
+    //int nbDEs = DEs.size();
     {
       for(int i = 0; i < 4; i++) {
         for(auto& h2 : mHistogramPreclustersXY[i]) {
