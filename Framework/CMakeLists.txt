@@ -39,7 +39,9 @@ add_root_dictionary(QualityControlTypes
 add_library(QualityControl
             src/ObjectsManager.cxx
             src/CheckRunner.cxx
+            src/AggregatorRunner.cxx
             src/CheckRunnerFactory.cxx
+            src/AggregatorRunnerFactory.cxx
             src/CheckInterface.cxx
             src/DatabaseFactory.cxx
             src/CcdbDatabase.cxx
@@ -51,6 +53,7 @@ add_library(QualityControl
             src/RepositoryBenchmark.cxx
             src/InfrastructureGenerator.cxx
             src/Check.cxx
+            src/Aggregator.cxx
             src/ServiceDiscovery.cxx
             src/Triggers.cxx
             src/TriggerHelpers.cxx
@@ -58,13 +61,17 @@ add_library(QualityControl
             src/PostProcessingFactory.cxx
             src/PostProcessingConfig.cxx
             src/PostProcessingInterface.cxx
+            src/PostProcessingDevice.cxx
             src/TrendingTask.cxx
             src/TrendingTaskConfig.cxx
             src/DummyDatabase.cxx
             src/DataProducer.cxx
             src/HistoProducer.cxx
             src/DataProducerExample.cxx
-            src/MonitorObjectCollection.cxx)
+            src/MonitorObjectCollection.cxx
+            src/UpdatePolicyManager.cxx
+            src/AdvancedWorkflow.cxx
+            src/Calculators.cxx)
 
 if(ENABLE_MYSQL)
   target_sources(QualityControl PRIVATE src/MySqlDatabase.cxx)
@@ -87,16 +94,16 @@ target_link_libraries(QualityControl
                              AliceO2::Monitoring
                              AliceO2::Configuration
                              AliceO2::Occ
+                             AliceO2::DebugGUI
                              ROOT::Net
                              Boost::container
                              O2::Framework
                              O2::CCDB
                              O2::MCHBase
-                             O2::MCHPreClustering
                              ms_gsl::ms_gsl
                              QualityControlTypes
                              O2::Mergers
-                             $<$<TARGET_EXISTS:O2::DataSampling>:O2::DataSampling>
+                             O2::DataSampling
                       PRIVATE Boost::system
                               $<$<BOOL:${ENABLE_MYSQL}>:MySQL::MySQL>
                               $<$<BOOL:${ENABLE_MYSQL}>:ROOT::RMySQL> ROOT::Gui
@@ -106,22 +113,13 @@ target_compile_definitions(QualityControl PRIVATE
                            $<$<BOOL:${ENABLE_MYSQL}>:_WITH_MYSQL>)
 
 add_root_dictionary(QualityControl
-                    HEADERS include/QualityControl/Check.h
+                    HEADERS
                             include/QualityControl/CheckInterface.h
-                            include/QualityControl/CheckRunner.h
-                            include/QualityControl/CheckRunnerFactory.h
-                            include/QualityControl/DatabaseInterface.h
-                            include/QualityControl/CcdbDatabase.h
-                            include/QualityControl/ServiceDiscovery.h
-                            include/QualityControl/TaskRunner.h
-                            include/QualityControl/TaskRunnerFactory.h
-                            include/QualityControl/InfrastructureGenerator.h
-                            include/QualityControl/InputUtils.h
+                            include/QualityControl/TaskInterface.h
+                            include/QualityControl/AggregatorInterface.h
                             include/QualityControl/PostProcessingInterface.h
                             include/QualityControl/TrendingTask.h
-                            include/QualityControl/Reductor.h
                             include/QualityControl/MonitorObjectCollection.h
-                            include/QualityControl/RootClassFactory.h
                     LINKDEF include/QualityControl/LinkDef.h
                     BASENAME QualityControl)
 
@@ -138,7 +136,9 @@ set(EXE_SRCS
     src/runReadoutForDataDump.cxx
     src/runRepositoryBenchmark.cxx
     src/runPostProcessing.cxx
-    src/runPostProcessingOCC.cxx)
+    src/runPostProcessingOCC.cxx
+    src/runLocationCalculator.cxx
+    src/runMergerCalculator.cxx)
 
 set(EXE_NAMES
     o2-qc-run-producer
@@ -151,7 +151,9 @@ set(EXE_NAMES
     o2-qc-run-readout-for-data-dump
     o2-qc-repository-benchmark
     o2-qc-run-postprocessing
-    o2-qc-run-postprocessing-occ)
+    o2-qc-run-postprocessing-occ
+    o2-qc-location-calculator
+    o2-qc-merger-calculator)
 
 # These were the original names before the convention changed. We will get rid
 # of them but for the time being we want to create symlinks to avoid confusion.
@@ -166,7 +168,9 @@ set(EXE_OLD_NAMES
     qcRunReadoutForDataDump
     repositoryBenchmark
     qcRunPostProcessing
-    qcRunPostProcessingOCC)
+    qcRunPostProcessingOCC
+    o2-qc-location-calculator
+    o2-qc-merger-calculator)
 
 # As per https://stackoverflow.com/questions/35765106/symbolic-links-cmake
 macro(install_symlink filepath sympath)
@@ -192,26 +196,16 @@ endforeach()
 # ---- Gui ----
 
 set(DATADUMP "")
-if(GLFW_FOUND)
+if(TARGET AliceO2::DebugGUI)
   set(DATADUMP "o2-qc-data-dump")
-
-  set(IMGUI_SRCS
-      src/imgui/imgui.cpp
-      src/imgui/imgui_draw.cpp
-      src/imgui/imgui_impl_glfw_gl3.cpp
-      src/imgui/gl3w.c
-      src/imgui/imgui_widgets.cpp
-      src/imgui/imgui_demo.cpp
-      src/imgui/BaseGui.cxx)
-  set_source_files_properties(${IMGUI_SRCS} PROPERTIES COMPILE_FLAGS -w)
 
   set(GUI_SRCS src/DataDumpGui.cxx src/runDataDump.cxx)
 
-  add_executable(${DATADUMP} ${GUI_SRCS} ${IMGUI_SRCS})
+  add_executable(${DATADUMP} ${GUI_SRCS})
 
-  target_link_libraries(${DATADUMP} PRIVATE QualityControl glfw)
+  target_link_libraries(${DATADUMP} PRIVATE QualityControl AliceO2::DebugGUI)
 else()
-  message(STATUS "GLFW not found, ${DATADUMP} will not be built")
+  message(STATUS "DebugGUI not found, ${DATADUMP} will not be built")
 endif()
 
 # ---- Tests ----
@@ -225,7 +219,9 @@ set(TEST_SRCS
     test/testTaskInterface.cxx
     test/testTaskRunner.cxx
     test/testCheckInterface.cxx
+    test/testAggregatorInterface.cxx
     test/testCheckRunner.cxx
+    test/testAggregatorRunner.cxx
     test/testCheck.cxx
     test/testQuality.cxx
     test/testQualityObject.cxx
@@ -243,6 +239,7 @@ set(TEST_SRCS
     test/testWorkflow.cxx
     test/testVersion.cxx
     test/testRepoPathUtils.cxx
+    test/testPolicyManager.cxx
   )
 
 set(TEST_ARGS
@@ -268,8 +265,11 @@ set(TEST_ARGS
     ""
     ""
     ""
+    ""
+    ""
     "-b --run"
     "-b --run"
+    ""
     ""
     ""
   )
@@ -295,7 +295,7 @@ endforeach()
 
 foreach(t testTaskInterface testWorkflow testTaskRunner testCheckWorkflow
         testInfrastructureGenerator testPostProcessingConfig testPostProcessingInterface
-        testPostProcessingRunner testCheck testCheckRunner testTrendingTask)
+        testPostProcessingRunner testCheck testCheckRunner testTrendingTask testAggregatorRunner)
   target_sources(${t} PRIVATE
                  ${CMAKE_BINARY_DIR}/getTestDataDirectory.cxx)
   target_include_directories(${t} PRIVATE ${CMAKE_SOURCE_DIR})
@@ -303,6 +303,7 @@ endforeach()
 
 target_include_directories(testVersion PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>)
 target_include_directories(testCcdbDatabase PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>)
+target_link_libraries(testTaskInterface PRIVATE O2::EMCALBase O2::EMCALCalib) 
 
 set_property(TEST testWorkflow PROPERTY TIMEOUT 60)
 set_property(TEST testWorkflow PROPERTY LABELS slow)
@@ -310,7 +311,7 @@ set_property(TEST testCheckWorkflow PROPERTY TIMEOUT 60)
 set_property(TEST testCheckWorkflow PROPERTY LABELS slow)
 set_property(TEST testObjectsManager PROPERTY TIMEOUT 20)
 set_property(TEST testObjectsManager PROPERTY LABELS slow)
-set_property(TEST testCcdbDatabase PROPERTY TIMEOUT 15)
+set_property(TEST testCcdbDatabase PROPERTY TIMEOUT 30)
 set_property(TEST testCcdbDatabase PROPERTY LABELS slow)
 set_property(TEST testCcdbDatabaseExtra PROPERTY LABELS manual)
 set_property(TEST testTrendingTask PROPERTY LABELS manual)
@@ -382,9 +383,11 @@ install(FILES example-default.json
               alfa.json
               dataDump.json
               basic.json
+              basic-aggregator.json
               basic-external-histo.json
               basic-no-sampling.json
               advanced.json
+              advanced-aggregator.json
               advanced-external-histo.json
               multiNode.json
               readout.json
@@ -409,6 +412,7 @@ install(PROGRAMS script/RepoCleaner/1_per_hour.py script/RepoCleaner/Ccdb.py scr
 
 set(TEST_FILES
   "testSharedConfig.json"
+  "testEmptyConfig.json"
   "testCheckWorkflow.json"
   "testTrendingTask.json"
   "testWorkflow.json")

@@ -37,8 +37,6 @@ using namespace o2::framework;
 
 #define QC_MCH_SAVE_TEMP_ROOTFILE 1
 
-#define MCH_FFEID_MAX (31*2 + 1)
-
 struct CRUheader {
   uint8_t header_version;
   uint8_t header_size;
@@ -515,7 +513,7 @@ void PedestalsTask::monitorDataReadout(o2::framework::ProcessingContext& ctx)
     }
   }
 }
-
+/*
 void PedestalsTask::monitorDataDigits(const o2::framework::DataRef& input)
 {
   //QcInfoLogger::GetInstance() << "monitorDataDigits" << AliceO2::InfoLogger::InfoLogger::endm;
@@ -614,17 +612,17 @@ void PedestalsTask::monitorDataDigits(const o2::framework::DataRef& input)
   }
 }
 }
-
+*/
 void PedestalsTask::monitorData(o2::framework::ProcessingContext& ctx)
 {
   //QcInfoLogger::GetInstance() << "monitorDataReadout" << AliceO2::InfoLogger::InfoLogger::endm;
   //fprintf(flog, "\n================\nmonitorDataReadout\n================\n");
   monitorDataReadout(ctx);
-  for (auto&& input : ctx.inputs()) {
-    //QcInfoLogger::GetInstance() << "run PedestalsTask: input " << input.spec->binding << AliceO2::InfoLogger::InfoLogger::endm;
-    if (input.spec->binding == "digits")
-      monitorDataDigits(input);
-  }
+  //for (auto&& input : ctx.inputs()) {
+  //  //QcInfoLogger::GetInstance() << "run PedestalsTask: input " << input.spec->binding << AliceO2::InfoLogger::InfoLogger::endm;
+  //  if (input.spec->binding == "digits")
+  //    monitorDataDigits(input);
+  //}
 }
 
 void PedestalsTask::endOfCycle()

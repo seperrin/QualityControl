@@ -16,6 +16,7 @@
 #include "QualityControl/QcInfoLogger.h"
 
 #include <boost/property_tree/ptree.hpp>
+#include <Framework/DataAllocator.h>
 
 using namespace o2::quality_control::core;
 using namespace o2::quality_control::repository;
@@ -23,14 +24,22 @@ using namespace o2::quality_control::repository;
 namespace o2::quality_control::postprocessing
 {
 
+constexpr long objectValidity = 1000l * 60 * 60 * 24 * 365 * 10;
+
 PostProcessingRunner::PostProcessingRunner(std::string name) //
   : mName(name)
 {
+  ILOG_INST.setFacility("PostProcessing");
+}
+
+void PostProcessingRunner::setPublicationCallback(MOCPublicationCallback callback)
+{
+  mPublicationCallback = callback;
 }
 
 void PostProcessingRunner::init(const boost::property_tree::ptree& config)
 {
-  ILOG(Info) << "Initializing PostProcessingRunner" << ENDM;
+  ILOG(Info, Support) << "Initializing PostProcessingRunner" << ENDM;
 
   mConfig = PostProcessingConfig(mName, config);
 
@@ -41,17 +50,23 @@ void PostProcessingRunner::init(const boost::property_tree::ptree& config)
     dbConfig[key] = value.get_value<std::string>();
   }
   mDatabase->connect(dbConfig);
-  ILOG(Info) << "Database that is going to be used : " << ENDM;
-  ILOG(Info) << ">> Implementation : " << config.get<std::string>("qc.config.database.implementation") << ENDM;
-  ILOG(Info) << ">> Host : " << config.get<std::string>("qc.config.database.host") << ENDM;
+  ILOG(Info, Support) << "Database that is going to be used : " << ENDM;
+  ILOG(Info, Support) << ">> Implementation : " << config.get<std::string>("qc.config.database.implementation") << ENDM;
+  ILOG(Info, Support) << ">> Host : " << config.get<std::string>("qc.config.database.host") << ENDM;
+
+  mObjectManager = std::make_shared<ObjectsManager>(mConfig.taskName, mConfig.detectorName, mConfig.consulUrl);
   mServices.registerService<DatabaseInterface>(mDatabase.get());
+  if (mPublicationCallback == nullptr) {
+    mPublicationCallback = publishToRepository(*mDatabase);
+  }
 
   // setup user's task
-  ILOG(Info) << "Creating a user task '" << mConfig.taskName << "'" << ENDM;
+  ILOG(Info, Support) << "Creating a user task '" << mConfig.taskName << "'" << ENDM;
   PostProcessingFactory f;
   mTask.reset(f.create(mConfig));
+  mTask->setObjectsManager(mObjectManager);
   if (mTask) {
-    ILOG(Info) << "The user task '" << mConfig.taskName << "' successfully created" << ENDM;
+    ILOG(Info, Support) << "The user task '" << mConfig.taskName << "' has been successfully created" << ENDM;
 
     mTaskState = TaskState::Created;
     mTask->setName(mConfig.taskName);
@@ -63,7 +78,7 @@ void PostProcessingRunner::init(const boost::property_tree::ptree& config)
 
 bool PostProcessingRunner::run()
 {
-  ILOG(Info) << "Checking triggers of the task '" << mTask->getName() << "'" << ENDM;
+  ILOG(Debug, Devel) << "Checking triggers of the task '" << mTask->getName() << "'" << ENDM;
 
   if (mTaskState == TaskState::Created) {
     if (Trigger trigger = trigger_helpers::tryTrigger(mInitTriggers)) {
@@ -79,7 +94,7 @@ bool PostProcessingRunner::run()
     }
   }
   if (mTaskState == TaskState::Finished) {
-    ILOG(Info) << "The user task finished." << ENDM;
+    ILOG(Debug, Devel) << "The user task finished." << ENDM;
     return false;
   }
   if (mTaskState == TaskState::INVALID) {
@@ -98,7 +113,7 @@ void PostProcessingRunner::runOverTimestamps(const std::vector<uint64_t>& timest
       " given. One is for the initialization, zero or more for update, one for finalization");
   }
 
-  ILOG(Info) << "Running the task '" << mTask->getName() << "' over " << timestamps.size() << " timestamps." << ENDM;
+  ILOG(Info, Support) << "Running the task '" << mTask->getName() << "' over " << timestamps.size() << " timestamps." << ENDM;
 
   doInitialize({ TriggerType::UserOrControl, timestamps.front() });
   for (size_t i = 1; i < timestamps.size() - 1; i++) {
@@ -110,12 +125,12 @@ void PostProcessingRunner::runOverTimestamps(const std::vector<uint64_t>& timest
 void PostProcessingRunner::start()
 {
   if (mTaskState == TaskState::Created || mTaskState == TaskState::Finished) {
-    mInitTriggers = trigger_helpers::createTriggers(mConfig.initTriggers);
+    mInitTriggers = trigger_helpers::createTriggers(mConfig.initTriggers, mConfig);
     if (trigger_helpers::hasUserOrControlTrigger(mConfig.initTriggers)) {
       doInitialize({ TriggerType::UserOrControl });
     }
   } else if (mTaskState == TaskState::Running) {
-    ILOG(Info) << "Requested start, but the user task is already running - doing nothing." << ENDM;
+    ILOG(Debug, Devel) << "Requested start, but the user task is already running - doing nothing." << ENDM;
   } else if (mTaskState == TaskState::INVALID) {
     throw std::runtime_error("The user task has INVALID state");
   } else {
@@ -130,7 +145,7 @@ void PostProcessingRunner::stop()
       doFinalize({ TriggerType::UserOrControl });
     }
   } else if (mTaskState == TaskState::Finished) {
-    ILOG(Info) << "Requested stop, but the user task is already finalized - doing nothing." << ENDM;
+    ILOG(Debug, Devel) << "Requested stop, but the user task is already finalized - doing nothing." << ENDM;
   } else if (mTaskState == TaskState::INVALID) {
     throw std::runtime_error("The user task has INVALID state");
   } else {
@@ -145,6 +160,7 @@ void PostProcessingRunner::reset()
   mTask.reset();
   mDatabase.reset();
   mServices = framework::ServiceRegistry();
+  mObjectManager.reset();
 
   mInitTriggers.clear();
   mUpdateTriggers.clear();
@@ -153,27 +169,52 @@ void PostProcessingRunner::reset()
 
 void PostProcessingRunner::doInitialize(Trigger trigger)
 {
-  ILOG(Info) << "Initializing the user task due to trigger '" << trigger << "'" << ENDM;
+  ILOG(Info, Support) << "Initializing the user task due to trigger '" << trigger << "'" << ENDM;
 
   mTask->initialize(trigger, mServices);
   mTaskState = TaskState::Running;
 
   // We create the triggers just after task init (and not any sooner), so the timer triggers work as expected.
-  mUpdateTriggers = trigger_helpers::createTriggers(mConfig.updateTriggers);
-  mStopTriggers = trigger_helpers::createTriggers(mConfig.stopTriggers);
+  mUpdateTriggers = trigger_helpers::createTriggers(mConfig.updateTriggers, mConfig);
+  mStopTriggers = trigger_helpers::createTriggers(mConfig.stopTriggers, mConfig);
 }
 
 void PostProcessingRunner::doUpdate(Trigger trigger)
 {
-  ILOG(Info) << "Updating the user task due to trigger '" << trigger << "'" << ENDM;
+  ILOG(Info, Support) << "Updating the user task due to trigger '" << trigger << "'" << ENDM;
   mTask->update(trigger, mServices);
+  mPublicationCallback(mObjectManager->getNonOwningArray(), trigger.timestamp, trigger.timestamp + objectValidity);
 }
 
 void PostProcessingRunner::doFinalize(Trigger trigger)
 {
-  ILOG(Info) << "Finalizing the user task due to trigger '" << trigger << "'" << ENDM;
+  ILOG(Info, Support) << "Finalizing the user task due to trigger '" << trigger << "'" << ENDM;
   mTask->finalize(trigger, mServices);
+  mPublicationCallback(mObjectManager->getNonOwningArray(), trigger.timestamp, trigger.timestamp + objectValidity);
   mTaskState = TaskState::Finished;
+}
+const std::string& PostProcessingRunner::getName()
+{
+  return mName;
+}
+
+MOCPublicationCallback publishToDPL(framework::DataAllocator& allocator, std::string outputBinding)
+{
+  return [&allocator = allocator, outputBinding = std::move(outputBinding)](const MonitorObjectCollection* moc, long, long) {
+    // TODO pass timestamps to objects, so they are later stored correctly.
+    allocator.snapshot(framework::OutputRef{ outputBinding }, *moc);
+  };
+}
+
+MOCPublicationCallback publishToRepository(o2::quality_control::repository::DatabaseInterface& repository)
+{
+  return [&](const MonitorObjectCollection* collection, long from, long to) {
+    for (const TObject* mo : *collection) {
+      // We have to copy the object so we can pass a shared_ptr.
+      // This is not ideal, but MySQL interface requires shared ptrs to queue the objects.
+      repository.storeMO(std::shared_ptr<MonitorObject>(dynamic_cast<MonitorObject*>(mo->Clone())), from, to);
+    }
+  };
 }
 
 } // namespace o2::quality_control::postprocessing

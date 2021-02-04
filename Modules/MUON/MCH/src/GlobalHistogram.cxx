@@ -211,7 +211,7 @@ void GlobalHistogram::getDeCenterST3(int de, float& xB0, float& yB0, float& xNB0
   o2::mch::contour::BBox<double> bbox = o2::mch::mapping::getBBox(csegment);
   //std::cout<<"DE "<<de<<"  BBOX "<<bbox<<std::endl;
 
-  double xmin = bbox.xmin();
+  //double xmin = bbox.xmin();
   double xmax = bbox.xmax();
   if (xId == 0) {
     // ST3 left, shift all detectors to the right
@@ -319,7 +319,7 @@ void GlobalHistogram::getDeCenterST4(int de, float& xB0, float& yB0, float& xNB0
   //std::cout<<"DE "<<de<<"  BBOX "<<bbox<<std::endl;
 
 
-  double xmin = bbox.xmin();
+  //double xmin = bbox.xmin();
   double xmax = bbox.xmax();
   if (xId == 0) {
     // ST3 left, shift all detectors to the right

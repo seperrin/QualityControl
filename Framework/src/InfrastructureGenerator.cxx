@@ -17,31 +17,30 @@
 
 #include "QualityControl/TaskRunner.h"
 #include "QualityControl/TaskRunnerFactory.h"
+#include "QualityControl/AggregatorRunnerFactory.h"
 #include "QualityControl/CheckRunner.h"
 #include "QualityControl/Check.h"
 #include "QualityControl/CheckRunnerFactory.h"
+#include "QualityControl/PostProcessingDevice.h"
 #include "QualityControl/Version.h"
 #include "QualityControl/QcInfoLogger.h"
 
 #include <Configuration/ConfigurationFactory.h>
-#if __has_include(<Framework/DataSampling.h>)
-#include <Framework/DataSampling.h>
-#else
-#include <DataSampling/DataSampling.h>
-using namespace o2::utilities;
-#endif
 #include <Framework/DataSpecUtils.h>
 #include <Framework/ExternalFairMQDeviceProxy.h>
+#include <Framework/DataDescriptorQueryBuilder.h>
 #include <Mergers/MergerInfrastructureBuilder.h>
 #include <Mergers/MergerBuilder.h>
-#include <Framework/DataDescriptorQueryBuilder.h>
+#include <DataSampling/DataSampling.h>
 
 #include <algorithm>
 
 using namespace o2::framework;
 using namespace o2::configuration;
 using namespace o2::mergers;
+using namespace o2::utilities;
 using namespace o2::quality_control::checker;
+using namespace o2::quality_control::postprocessing;
 using boost::property_tree::ptree;
 using SubSpec = o2::header::DataHeader::SubSpecificationType;
 
@@ -55,13 +54,16 @@ framework::WorkflowSpec InfrastructureGenerator::generateStandaloneInfrastructur
   printVersion();
 
   TaskRunnerFactory taskRunnerFactory;
-  for (const auto& [taskName, taskConfig] : config->getRecursive("qc.tasks")) {
-    if (taskConfig.get<bool>("active", true)) {
-      workflow.emplace_back(taskRunnerFactory.create(taskName, configurationSource, 0));
+  if (config->getRecursive("qc").count("tasks")) {
+    for (const auto& [taskName, taskConfig] : config->getRecursive("qc.tasks")) {
+      if (taskConfig.get<bool>("active", true)) {
+        workflow.emplace_back(taskRunnerFactory.create(taskName, configurationSource, 0));
+      }
     }
   }
-
-  generateCheckRunners(workflow, configurationSource);
+  auto checkRunnerOutputs = generateCheckRunners(workflow, configurationSource);
+  generateAggregator(workflow, configurationSource, checkRunnerOutputs);
+  generatePostProcessing(workflow, configurationSource);
 
   return workflow;
 }
@@ -80,6 +82,10 @@ WorkflowSpec InfrastructureGenerator::generateLocalInfrastructure(std::string co
   auto config = ConfigurationFactory::getConfiguration(configurationSource);
   printVersion();
 
+  if (config->getRecursive("qc").count("tasks") == 0) {
+    return workflow;
+  }
+
   for (const auto& [taskName, taskConfig] : config->getRecursive("qc.tasks")) {
     if (taskConfig.get<bool>("active")) {
       if (taskConfig.get<std::string>("location") == "local") {
@@ -88,13 +94,14 @@ WorkflowSpec InfrastructureGenerator::generateLocalInfrastructure(std::string co
           throw std::runtime_error("No local machines specified for task " + taskName + " in its configuration");
         }
 
-        bool needsMergers = taskConfig.get_child("localMachines").size() > 1;
-        size_t id = needsMergers ? 1 : 0;
+        bool moreThanOneMachine = taskConfig.get_child("localMachines").size() > 1;
+        size_t id = moreThanOneMachine ? 1 : 0;
         for (const auto& machine : taskConfig.get_child("localMachines")) {
           // We spawn a task and proxy only if we are on the right machine.
           if (machine.second.get<std::string>("") == host) {
             // Generate QC Task Runner
-            workflow.emplace_back(taskRunnerFactory.create(taskName, configurationSource, id, needsMergers));
+            bool needsResetAfterCycle = moreThanOneMachine && taskConfig.get<std::string>("mergingMode", "delta") == "delta";
+            workflow.emplace_back(taskRunnerFactory.create(taskName, configurationSource, id, needsResetAfterCycle));
             // Generate an output proxy
             // These should be removed when we are able to declare dangling output in normal DPL devices
             generateLocalTaskLocalProxy(workflow, id, taskName, taskConfig.get<std::string>("remoteMachine"), taskConfig.get<std::string>("remotePort"));
@@ -147,48 +154,52 @@ o2::framework::WorkflowSpec InfrastructureGenerator::generateRemoteInfrastructur
   auto config = ConfigurationFactory::getConfiguration(configurationSource);
   printVersion();
 
-  TaskRunnerFactory taskRunnerFactory;
-  for (const auto& [taskName, taskConfig] : config->getRecursive("qc.tasks")) {
-    if (taskConfig.get<bool>("active", true)) {
+  if (config->getRecursive("qc").count("tasks")) {
+    TaskRunnerFactory taskRunnerFactory;
+    for (const auto& [taskName, taskConfig] : config->getRecursive("qc.tasks")) {
+      if (taskConfig.get<bool>("active", true)) {
 
-      if (taskConfig.get<std::string>("location") == "local") {
-        // if tasks are LOCAL, generate input proxies + mergers + checkers
+        if (taskConfig.get<std::string>("location") == "local") {
+          // if tasks are LOCAL, generate input proxies + mergers + checkers
 
-        size_t numberOfLocalMachines = taskConfig.get_child("localMachines").size() > 1 ? taskConfig.get_child("localMachines").size() : 1;
+          size_t numberOfLocalMachines = taskConfig.get_child("localMachines").size() > 1 ? taskConfig.get_child("localMachines").size() : 1;
 
-        // Generate an input proxy
-        // These should be removed when we are able to declare dangling inputs in normal DPL devices
-        generateLocalTaskRemoteProxy(workflow, taskName, numberOfLocalMachines, taskConfig.get<std::string>("remotePort"));
+          // Generate an input proxy
+          // These should be removed when we are able to declare dangling inputs in normal DPL devices
+          generateLocalTaskRemoteProxy(workflow, taskName, numberOfLocalMachines, taskConfig.get<std::string>("remotePort"));
 
-        // Generate a Merger only when there is a need to merge something - there is more than one machine with the QC Task
-        // I don't expect the list of machines to be reconfigured - all of them should be declared beforehand,
-        // even if some of them will be on standby.
-        if (numberOfLocalMachines > 1) {
-          generateMergers(workflow, taskName, numberOfLocalMachines, taskConfig.get<double>("cycleDurationSeconds"));
+          // Generate a Merger only when there is a need to merge something - there is more than one machine with the QC Task
+          // I don't expect the list of machines to be reconfigured - all of them should be declared beforehand,
+          // even if some of them will be on standby.
+          if (numberOfLocalMachines > 1) {
+            generateMergers(workflow, taskName, numberOfLocalMachines,
+                            taskConfig.get<double>("cycleDurationSeconds"),
+                            taskConfig.get<std::string>("mergingMode", "delta"));
+          }
+
+        } else if (taskConfig.get<std::string>("location") == "remote") {
+
+          // -- if tasks are REMOTE, generate dispatcher proxies + tasks + checkers
+          // (for the time being we don't foresee parallel tasks on QC servers, so no mergers here)
+
+          // fixme: ideally we should check if we are on the right remote machine, but now we support only n -> 1 setups,
+          //  so there is no point. Also, I expect that we should be able to generate one big topology or its parts
+          //  and we would place it among QC servers using AliECS, not by configuration files.
+
+          // Collecting Data Sampling Policies
+          auto dataSourceTree = taskConfig.get_child("dataSource");
+          std::string type = dataSourceTree.get<std::string>("type");
+          if (type == "dataSamplingPolicy") {
+            samplingPoliciesUsed.insert(dataSourceTree.get<std::string>("name"));
+          } else if (type == "direct") {
+            throw std::runtime_error("Configuration error: Remote QC tasks such as " + taskName + " cannot use direct data sources");
+          } else {
+            throw std::runtime_error("Configuration error: dataSource type unknown : " + type);
+          }
+
+          // Creating the remote task
+          workflow.emplace_back(taskRunnerFactory.create(taskName, configurationSource, 0));
         }
-
-      } else if (taskConfig.get<std::string>("location") == "remote") {
-
-        // -- if tasks are REMOTE, generate dispatcher proxies + tasks + checkers
-        // (for the time being we don't foresee parallel tasks on QC servers, so no mergers here)
-
-        // fixme: ideally we should check if we are on the right remote machine, but now we support only n -> 1 setups,
-        //  so there is no point. Also, I expect that we should be able to generate one big topology or its parts
-        //  and we would place it among QC servers using AliECS, not by configuration files.
-
-        // Collecting Data Sampling Policies
-        auto dataSourceTree = taskConfig.get_child("dataSource");
-        std::string type = dataSourceTree.get<std::string>("type");
-        if (type == "dataSamplingPolicy") {
-          samplingPoliciesUsed.insert(dataSourceTree.get<std::string>("name"));
-        } else if (type == "direct") {
-          throw std::runtime_error("Configuration error: Remote QC tasks such as " + taskName + " cannot use direct data sources");
-        } else {
-          throw std::runtime_error("Configuration error: dataSource type unknown : " + type);
-        }
-
-        // Creating the remote task
-        workflow.emplace_back(taskRunnerFactory.create(taskName, configurationSource, 0));
       }
     }
   }
@@ -206,6 +217,7 @@ o2::framework::WorkflowSpec InfrastructureGenerator::generateRemoteInfrastructur
   }
 
   generateCheckRunners(workflow, configurationSource);
+  generatePostProcessing(workflow, configurationSource);
 
   return workflow;
 }
@@ -221,6 +233,7 @@ void InfrastructureGenerator::customizeInfrastructure(std::vector<framework::Com
   TaskRunnerFactory::customizeInfrastructure(policies);
   MergerBuilder::customizeInfrastructure(policies);
   CheckRunnerFactory::customizeInfrastructure(policies);
+  AggregatorRunnerFactory::customizeInfrastructure(policies);
 }
 
 void InfrastructureGenerator::printVersion()
@@ -309,7 +322,8 @@ void InfrastructureGenerator::generateLocalTaskRemoteProxy(framework::WorkflowSp
 }
 
 void InfrastructureGenerator::generateMergers(framework::WorkflowSpec& workflow, std::string taskName,
-                                              size_t numberOfLocalMachines, double cycleDurationSeconds)
+                                              size_t numberOfLocalMachines, double cycleDurationSeconds,
+                                              std::string mergingMode)
 {
   Inputs mergerInputs;
   for (size_t id = 1; id <= numberOfLocalMachines; id++) {
@@ -327,10 +341,8 @@ void InfrastructureGenerator::generateMergers(framework::WorkflowSpec& workflow,
     { { "main" }, TaskRunner::createTaskDataOrigin(), TaskRunner::createTaskDataDescription(taskName), 0 });
   MergerConfig mergerConfig;
   // if we are to change the mode to Full, disable reseting tasks after each cycle.
-  mergerConfig.inputObjectTimespan = { InputObjectsTimespan::LastDifference, 0 };
-  mergerConfig.publicationDecision = {
-    PublicationDecision::EachNSeconds, cycleDurationSeconds
-  };
+  mergerConfig.inputObjectTimespan = { (mergingMode.empty() || mergingMode == "delta") ? InputObjectsTimespan::LastDifference : InputObjectsTimespan::FullHistory };
+  mergerConfig.publicationDecision = { PublicationDecision::EachNSeconds, cycleDurationSeconds };
   mergerConfig.mergedObjectTimespan = { MergedObjectTimespan::FullHistory, 0 };
   // for now one merger should be enough, multiple layers to be supported later
   mergerConfig.topologySize = { TopologySize::NumberOfLayers, 1 };
@@ -339,7 +351,7 @@ void InfrastructureGenerator::generateMergers(framework::WorkflowSpec& workflow,
   mergersBuilder.generateInfrastructure(workflow);
 }
 
-void InfrastructureGenerator::generateCheckRunners(framework::WorkflowSpec& workflow, std::string configurationSource)
+vector<OutputSpec> InfrastructureGenerator::generateCheckRunners(framework::WorkflowSpec& workflow, std::string configurationSource)
 {
   // todo have a look if this complex procedure can be simplified.
   // todo also make well defined and scoped functions to make it more readable and clearer.
@@ -351,11 +363,21 @@ void InfrastructureGenerator::generateCheckRunners(framework::WorkflowSpec& work
 
   auto config = ConfigurationFactory::getConfiguration(configurationSource);
 
-  // Build tasksOutputMap based on active tasks in the config
-  for (const auto& [taskName, taskConfig] : config->getRecursive("qc.tasks")) {
-    if (taskConfig.get<bool>("active", true)) {
-      InputSpec taskOutput{ taskName, TaskRunner::createTaskDataOrigin(), TaskRunner::createTaskDataDescription(taskName) };
-      tasksOutputMap.insert({ DataSpecUtils::label(taskOutput), taskOutput });
+  if (config->getRecursive("qc").count("tasks")) {
+    for (const auto& [taskName, taskConfig] : config->getRecursive("qc.tasks")) {
+      if (taskConfig.get<bool>("active", true)) {
+        InputSpec taskOutput{ taskName, TaskRunner::createTaskDataOrigin(), TaskRunner::createTaskDataDescription(taskName) };
+        tasksOutputMap.insert({ DataSpecUtils::label(taskOutput), taskOutput });
+      }
+    }
+  }
+
+  if (config->getRecursive("qc").count("postprocessing")) {
+    for (const auto& [ppTaskName, ppTaskConfig] : config->getRecursive("qc.postprocessing")) {
+      if (ppTaskConfig.get<bool>("active", true)) {
+        InputSpec taskOutput{ ppTaskName, PostProcessingDevice::createPostProcessingDataOrigin(), PostProcessingDevice::createPostProcessingDataDescription(ppTaskName) };
+        tasksOutputMap.insert({ DataSpecUtils::label(taskOutput), taskOutput });
+      }
     }
   }
 
@@ -418,23 +440,74 @@ void InfrastructureGenerator::generateCheckRunners(framework::WorkflowSpec& work
 
   // Create CheckRunners: 1 per set of inputs
   CheckRunnerFactory checkRunnerFactory;
+  vector<framework::OutputSpec> checkRunnerOutputs; // needed later for the aggregators
   for (auto& [inputNames, checks] : checksMap) {
     //Logging
-    ILOG(Info) << ">> Inputs (" << inputNames.size() << "): ";
-    for (auto& name : inputNames)
-      ILOG(Info) << name << " ";
-    ILOG(Info) << " ; Checks (" << checks.size() << "): ";
+    ILOG(Info, Devel) << ">> Inputs (" << inputNames.size() << "): ";
+    for (const auto& name : inputNames)
+      ILOG(Info, Devel) << name << " ";
+    ILOG(Info, Devel) << " ; Checks (" << checks.size() << "): ";
     for (auto& check : checks)
-      ILOG(Info) << check.getName() << " ";
-    ILOG(Info) << " ; Stores (" << storeVectorMap[inputNames].size() << "): ";
+      ILOG(Info, Devel) << check.getName() << " ";
+    ILOG(Info, Devel) << " ; Stores (" << storeVectorMap[inputNames].size() << "): ";
     for (auto& input : storeVectorMap[inputNames])
-      ILOG(Info) << input << " ";
-    ILOG(Info) << ENDM;
+      ILOG(Info, Devel) << input << " ";
+    ILOG(Info, Devel) << ENDM;
 
     if (!checks.empty()) { // Create a CheckRunner for the grouped checks
-      workflow.emplace_back(checkRunnerFactory.create(checks, configurationSource, storeVectorMap[inputNames]));
+      DataProcessorSpec spec = checkRunnerFactory.create(checks, configurationSource, storeVectorMap[inputNames]);
+      workflow.emplace_back(spec);
+      checkRunnerOutputs.insert(checkRunnerOutputs.end(), spec.outputs.begin(), spec.outputs.end());
     } else { // If there are no checks, create a sink CheckRunner
-      workflow.emplace_back(checkRunnerFactory.createSinkDevice(tasksOutputMap.find(inputNames[0])->second, configurationSource));
+      DataProcessorSpec spec = checkRunnerFactory.createSinkDevice(tasksOutputMap.find(inputNames[0])->second, configurationSource);
+      workflow.emplace_back(spec);
+      checkRunnerOutputs.insert(checkRunnerOutputs.end(), spec.outputs.begin(), spec.outputs.end());
+    }
+  }
+
+  ILOG(Info) << ">> Outputs (" << checkRunnerOutputs.size() << "): ";
+  for (const auto& output : checkRunnerOutputs)
+    ILOG(Info) << DataSpecUtils::describe(output) << " ";
+  ILOG(Info) << ENDM;
+
+  return checkRunnerOutputs;
+}
+
+void InfrastructureGenerator::generateAggregator(WorkflowSpec& workflow, std::string configurationSource, vector<framework::OutputSpec>& checkRunnerOutputs)
+{
+  // TODO consider whether we should recompute checkRunnerOutputs instead of receiving it all baked.
+  auto config = ConfigurationFactory::getConfiguration(configurationSource);
+  if (config->getRecursive("qc").count("aggregators") == 0) {
+    ILOG(Warning, Devel) << "No \"aggregators\" structure found in the config file. If no postprocessing is expected, then it is completely fine." << ENDM;
+    return;
+  }
+  DataProcessorSpec spec = AggregatorRunnerFactory::create(checkRunnerOutputs, configurationSource);
+  workflow.emplace_back(spec);
+}
+
+void InfrastructureGenerator::generatePostProcessing(WorkflowSpec& workflow, std::string configurationSource)
+{
+  auto config = ConfigurationFactory::getConfiguration(configurationSource);
+  if (config->getRecursive("qc").count("postprocessing") == 0) {
+    ILOG(Warning, Devel) << "No \"postprocessing\" structure found in the config file. If no postprocessing is expected, then it is completely fine." << ENDM;
+    return;
+  }
+  for (const auto& [ppTaskName, ppTaskConfig] : config->getRecursive("qc.postprocessing")) {
+    if (ppTaskConfig.get<bool>("active", true)) {
+
+      PostProcessingDevice ppTask{ ppTaskName, configurationSource };
+
+      DataProcessorSpec ppTaskSpec{
+        ppTask.getDeviceName(),
+        ppTask.getInputsSpecs(),
+        ppTask.getOutputSpecs(),
+        {},
+        ppTask.getOptions()
+      };
+
+      ppTaskSpec.algorithm = adaptFromTask<PostProcessingDevice>(std::move(ppTask));
+
+      workflow.emplace_back(std::move(ppTaskSpec));
     }
   }
 }

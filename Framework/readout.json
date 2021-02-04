@@ -25,19 +25,27 @@
     "tasks": {
       "daqTask": {
         "active": "true",
-        "className": "o2::quality_control_modules::muonchambers::RawDataProcessor",
-        "moduleName": "QcMuonChambers",
-        "detectorName": "MCH",
+        "className": "o2::quality_control_modules::daq::DaqTask",
+        "moduleName": "QcDaq",
+        "detectorName": "DAQ",
         "cycleDurationSeconds": "10",
         "maxNumberCycles": "-1",
         "dataSource": {
           "type": "dataSamplingPolicy",
           "name": "readout"
         },
-        "location": "remote"
+        "location": "remote",
+        "taskParameters": {
+          "": "All the printing options might significantly slow down your QC",
+          "printInputHeader": "false",        "": "set to true to print all headers",
+          "printInputPayload": "false",       "": "hex or bin (anything else means no)",
+          "printInputPayloadLimit": "-1",     "": "only print the X first words (-1 means no limit)",
+          "printPageInfo": "false",           "": "set to true to print information about pages",
+          "printRDH": "false",                "": "set to true to print the RDHs"
+        }
       }
     }
-  }
+  },
   "dataSamplingPolicies": [
     {
       "id": "readout",

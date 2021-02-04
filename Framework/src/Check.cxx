@@ -25,6 +25,7 @@
 #include "QualityControl/TaskRunner.h"
 #include "QualityControl/InputUtils.h"
 #include "QualityControl/RootClassFactory.h"
+#include "QualityControl/PostProcessingDevice.h"
 // Fairlogger
 #include <fairlogger/Logger.h>
 
@@ -34,6 +35,7 @@ using namespace o2::configuration;
 
 using namespace o2::quality_control::checker;
 using namespace o2::quality_control::core;
+using namespace o2::quality_control::postprocessing;
 using namespace std;
 
 /// Static functions
@@ -57,29 +59,22 @@ Check::Check(std::string checkName, std::string configurationSource)
     mOutputSpec{ "QC", Check::createCheckerDataDescription(checkName), 0 },
     mBeautify(true)
 {
-  mPolicy = [](std::map<std::string, unsigned int>) {
-    // Prevent from using of uninitiated policy
-    BOOST_THROW_EXCEPTION(FatalException() << errinfo_details("Policy not initiated: try to run Check::init() first"));
-    return false;
-  };
-
   try {
     initConfig(checkName);
   } catch (...) {
     std::string diagnostic = boost::current_exception_diagnostic_information();
-    LOG(ERROR) << "Unexpected exception, diagnostic information follows:\n"
-               << diagnostic;
+    ILOG(Fatal, Ops) << "Unexpected exception, diagnostic information follows:\n"
+                     << diagnostic << ENDM;
     throw;
   }
 }
 
 void Check::initConfig(std::string checkName)
 {
-  mCheckConfig.checkName = checkName;
+  mCheckConfig.name = checkName;
 
   std::unique_ptr<ConfigurationInterface> config = ConfigurationFactory::getConfiguration(mConfigurationSource);
-  std::vector<std::string> inputs;
-  const auto& checkConfig = config->getRecursive("qc.checks." + mCheckConfig.checkName);
+  const auto& checkConfig = config->getRecursive("qc.checks." + mCheckConfig.name);
 
   // Params
   if (checkConfig.count("checkParameters")) {
@@ -95,12 +90,15 @@ void Check::initConfig(std::string checkName)
   mNumberOfTaskSources = 0;
   for (const auto& [_key, dataSource] : checkConfig.get_child("dataSource")) {
     (void)_key;
-    if (dataSource.get<std::string>("type") == "Task" || dataSource.get<std::string>("type") == "ExternalTask") {
+    if (auto sourceType = dataSource.get<std::string>("type");
+        sourceType == "Task" || sourceType == "ExternalTask" || sourceType == "PostProcessing") {
       auto taskName = dataSource.get<std::string>("name");
       mNumberOfTaskSources++;
 
       if (dataSource.get<std::string>("type") == "Task") {
         mInputs.push_back({ taskName, TaskRunner::createTaskDataOrigin(), TaskRunner::createTaskDataDescription(taskName) });
+      } else if (dataSource.get<std::string>("type") == "PostProcessing") {
+        mInputs.push_back({ taskName, PostProcessingDevice::createPostProcessingDataOrigin(), PostProcessingDevice::createPostProcessingDataDescription(taskName) });
       } else if (dataSource.get<std::string>("type") == "ExternalTask") {
         auto query = config->getString("qc.externalTasks." + taskName + ".query").get();
         framework::Inputs input = o2::framework::DataDescriptorQueryBuilder::parse(query.c_str());
@@ -109,18 +107,18 @@ void Check::initConfig(std::string checkName)
       }
 
       // Subscribe on predefined MOs.
-      // If "MOs" are not set or "MOs" is set to "all", the check function will be triggered whenever a new MO appears.
-      if (dataSource.count("MOs") == 0 || dataSource.get<std::string>("MOs") == "all") {
+      // If "MOs" are not set, the check function will be triggered whenever a new MO appears.
+      if (dataSource.count("MOs") == 0) {
         // fixme: this is a dirty fix. Policies should be refactored, so this check won't be needed.
         if (mCheckConfig.policyType != "OnEachSeparately") {
           mCheckConfig.policyType = "_OnGlobalAny";
         }
-        mCheckConfig.allMOs = true;
+        mCheckConfig.allObjects = true;
       } else {
         for (const auto& moName : dataSource.get_child("MOs")) {
           auto name = std::string(taskName + "/" + moName.second.get_value<std::string>());
-          if (std::find(mCheckConfig.moNames.begin(), mCheckConfig.moNames.end(), name) == mCheckConfig.moNames.end()) {
-            mCheckConfig.moNames.push_back(name);
+          if (std::find(mCheckConfig.objectNames.begin(), mCheckConfig.objectNames.end(), name) == mCheckConfig.objectNames.end()) {
+            mCheckConfig.objectNames.push_back(name);
           }
         }
       }
@@ -138,142 +136,35 @@ void Check::initConfig(std::string checkName)
   mCheckConfig.detectorName = checkConfig.get<std::string>("detectorName", "DET");
 }
 
-void Check::initPolicy(std::string policyType)
-{
-  if (policyType == "OnAll") {
-    /** 
-     * Run check if all MOs are updated 
-     */
-
-    mPolicy = [&](std::map<std::string, unsigned int>& revisionMap) {
-      for (const auto& moname : mCheckConfig.moNames) {
-        if (revisionMap[moname] <= mMORevision) {
-          // Expect: revisionMap[notExistingKey] == 0
-          return false;
-        }
-      }
-      return true;
-    };
-  } else if (policyType == "OnAnyNonZero") {
-    /**
-     * Return true if any declared MOs were updated
-     * Guarantee that all declared MOs are available
-     */
-    mPolicy = [&](std::map<std::string, unsigned int>& revisionMap) {
-      if (!mPolicyHelper) {
-        // Check if all monitor objects are available
-        for (const auto& moname : mCheckConfig.moNames) {
-          if (!revisionMap.count(moname)) {
-            return false;
-          }
-        }
-        // From now on all MOs are available
-        mPolicyHelper = true;
-      }
-
-      for (const auto& moname : mCheckConfig.moNames) {
-        if (revisionMap[moname] > mMORevision) {
-          return true;
-        }
-      }
-      return false;
-    };
-
-  } else if (policyType == "OnEachSeparately") {
-    /**
-     * Return true if any declared MOs were updated
-     * This is the same behaviour as OnAny, but we should pass
-     * only one MO to a check at once.
-     */
-    mPolicy = [&](std::map<std::string, unsigned int>& revisionMap) {
-      if (mCheckConfig.allMOs) {
-        return true;
-      }
-
-      for (const auto& moname : mCheckConfig.moNames) {
-        if (revisionMap.count(moname) && revisionMap[moname] > mMORevision) {
-          return true;
-        }
-      }
-      return false;
-    };
-
-  } else if (policyType == "_OnGlobalAny") {
-    /**
-     * Return true if any MOs were updated.
-     * Inner policy - used for `"MOs": "all"`
-     * Might return true even if MO is not used in Check
-     */
-
-    mPolicy = [](std::map<std::string, unsigned int>& revisionMap) {
-      // Expecting check of this policy only if any change
-      (void)revisionMap; // Suppress Unused warning
-      return true;
-    };
-
-  } else /* if (policyType == "OnAny") */ {
-    /**
-     * Default behaviour
-     *
-     * Run check if any declared MOs are updated
-     * Does not guarantee to contain all declared MOs 
-     */
-    mPolicy = [&](std::map<std::string, unsigned int>& revisionMap) {
-      for (const auto& moname : mCheckConfig.moNames) {
-        if (revisionMap.count(moname) && revisionMap[moname] > mMORevision) {
-          return true;
-        }
-      }
-      return false;
-    };
-  }
-}
-
 void Check::init()
 {
   try {
     mCheckInterface = root_class_factory::create<CheckInterface>(mCheckConfig.moduleName, mCheckConfig.className);
     mCheckInterface->setCustomParameters(mCheckConfig.customParameters);
-    mCheckInterface->configure(mCheckConfig.checkName);
+    mCheckInterface->configure(mCheckConfig.name);
   } catch (...) {
     std::string diagnostic = boost::current_exception_diagnostic_information();
-    LOG(ERROR) << "Unexpected exception, diagnostic information follows:\n"
-               << diagnostic;
+    ILOG(Fatal, Ops) << "Unexpected exception, diagnostic information follows:\n"
+                     << diagnostic << ENDM;
     throw;
   }
-
-  /** 
-   * The policy needs to be here. If running in constructor, the lambda gets wrong reference
-   * and runs into SegmentationFault.
-   */
-  initPolicy(mCheckConfig.policyType);
 
   // Determine whether we can beautify
   // See QC-299 for details
   if (mNumberOfTaskSources > 1) {
     mBeautify = false;
-    ILOG(Warning) << "Beautification disabled because more than one source is used in this Check (" << mCheckConfig.checkName << ")" << ENDM;
+    ILOG(Warning, Devel) << "Beautification disabled because more than one source is used in this Check (" << mCheckConfig.name << ")" << ENDM;
   }
 
   // Print setting
-  mLogger << mCheckConfig.checkName << ": Module " << mCheckConfig.moduleName << AliceO2::InfoLogger::InfoLogger::endm;
-  mLogger << mCheckConfig.checkName << ": Class " << mCheckConfig.className << AliceO2::InfoLogger::InfoLogger::endm;
-  mLogger << mCheckConfig.checkName << ": Detector " << mCheckConfig.detectorName << AliceO2::InfoLogger::InfoLogger::endm;
-  mLogger << mCheckConfig.checkName << ": Policy " << mCheckConfig.policyType << AliceO2::InfoLogger::InfoLogger::endm;
-  mLogger << mCheckConfig.checkName << ": MonitorObjects : " << AliceO2::InfoLogger::InfoLogger::endm;
-  for (const auto& moname : mCheckConfig.moNames) {
-    mLogger << mCheckConfig.checkName << "   - " << moname << AliceO2::InfoLogger::InfoLogger::endm;
+  mLogger << mCheckConfig.name << ": Module " << mCheckConfig.moduleName << AliceO2::InfoLogger::InfoLogger::endm;
+  mLogger << mCheckConfig.name << ": Class " << mCheckConfig.className << AliceO2::InfoLogger::InfoLogger::endm;
+  mLogger << mCheckConfig.name << ": Detector " << mCheckConfig.detectorName << AliceO2::InfoLogger::InfoLogger::endm;
+  mLogger << mCheckConfig.name << ": Policy " << mCheckConfig.policyType << AliceO2::InfoLogger::InfoLogger::endm;
+  mLogger << mCheckConfig.name << ": MonitorObjects : " << AliceO2::InfoLogger::InfoLogger::endm;
+  for (const auto& moname : mCheckConfig.objectNames) {
+    mLogger << mCheckConfig.name << "   - " << moname << AliceO2::InfoLogger::InfoLogger::endm;
   }
-}
-
-bool Check::isReady(std::map<std::string, unsigned int>& revisionMap)
-{
-  return mPolicy(revisionMap);
-}
-
-void Check::updateRevision(unsigned int revision)
-{
-  mMORevision = revision;
 }
 
 QualityObjectsType Check::check(std::map<std::string, std::shared_ptr<MonitorObject>>& moMap)
@@ -284,7 +175,7 @@ QualityObjectsType Check::check(std::map<std::string, std::shared_ptr<MonitorObj
 
   std::map<std::string, std::shared_ptr<MonitorObject>> shadowMap;
   // Take only the MOs which are needed to be checked
-  if (mCheckConfig.allMOs) {
+  if (mCheckConfig.allObjects) {
     /*
      * User didn't specify the MOs.
      * All MOs are passed, no shadowing needed.
@@ -298,7 +189,7 @@ QualityObjectsType Check::check(std::map<std::string, std::shared_ptr<MonitorObj
      *
      * Implementation: Copy to different map only required MOs.
      */
-    for (auto& key : mCheckConfig.moNames) {
+    for (auto& key : mCheckConfig.objectNames) {
       // don't create empty shared_ptr
       if (moMap.count(key)) {
         shadowMap.insert({ key, moMap[key] });
@@ -323,11 +214,11 @@ QualityObjectsType Check::check(std::map<std::string, std::shared_ptr<MonitorObj
     boost::copy(moMapToCheck | boost::adaptors::map_keys, std::back_inserter(monitorObjectsNames));
 
     auto quality = mCheckInterface->check(&moMapToCheck);
-    mLogger << "Check '" << mCheckConfig.checkName << "', quality '" << quality << "'" << ENDM;
+    mLogger << "Check '" << mCheckConfig.name << "', quality '" << quality << "'" << ENDM;
     // todo: take metadata from somewhere
     qualityObjects.emplace_back(std::make_shared<QualityObject>(
       quality,
-      mCheckConfig.checkName,
+      mCheckConfig.name,
       mCheckConfig.detectorName,
       mCheckConfig.policyType,
       mInputsStringified,
@@ -347,4 +238,19 @@ void Check::beautify(std::map<std::string, std::shared_ptr<MonitorObject>>& moMa
   for (auto const& item : moMap) {
     mCheckInterface->beautify(item.second /*mo*/, quality);
   }
+}
+
+std::string Check::getPolicyName() const
+{
+  return mCheckConfig.policyType;
+}
+
+std::vector<std::string> Check::getObjectsNames() const
+{
+  return mCheckConfig.objectNames;
+}
+
+bool Check::getAllObjectsOption() const
+{
+  return mCheckConfig.allObjects;
 }

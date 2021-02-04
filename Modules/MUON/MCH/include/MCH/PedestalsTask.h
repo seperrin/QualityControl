@@ -36,7 +36,7 @@ class PedestalsTask final : public TaskInterface
   void startOfActivity(Activity& activity) override;
   void startOfCycle() override;
   void monitorDataReadout(o2::framework::ProcessingContext& ctx);
-  void monitorDataDigits(const o2::framework::DataRef& input);
+  //void monitorDataDigits(const o2::framework::DataRef& input);
   void monitorData(o2::framework::ProcessingContext& ctx) override;
   void endOfCycle() override;
   void endOfActivity(Activity& activity) override;

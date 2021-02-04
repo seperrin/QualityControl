@@ -17,6 +17,10 @@
       * [Definition and access of task-specific configuration](#definition-and-access-of-task-specific-configuration)
       * [Custom QC object metadata](#custom-qc-object-metadata)
       * [Canvas options](#canvas-options)
+      * [QC with DPL Analysis](#qc-with-dpl-analysis)
+         * [Getting AODs directly](#getting-aods-directly)
+         * [Merging with other analysis workflows](#merging-with-other-analysis-workflows)
+         * [Enabling a workflow to run on Hyperloop](#enabling-a-workflow-to-run-on-hyperloop)
       * [Data Inspector](#data-inspector)
          * [Prerequisite](#prerequisite)
          * [Compilation](#compilation)
@@ -33,10 +37,12 @@
          * [Common configuration](#common-configuration)
          * [QC Tasks configuration](#qc-tasks-configuration)
          * [QC Checks configuration](#qc-checks-configuration)
+         * [QC Aggregators configuration](#qc-aggregators-configuration)
          * [QC Post-processing configuration](#qc-post-processing-configuration)
          * [External tasks configuration](#external-tasks-configuration)
 
-<!-- Added by: barth, at: Lun 17 aoû 2020 14:57:43 CEST -->
+<!-- Added by: bvonhall, at:  -->
+
 <!--te-->
 
 
@@ -165,11 +171,17 @@ almost like the usual one, but with a few additional parameters. In case of a lo
           "localnode2"
         ],
         "remoteMachine": "qcnode",
-        "remotePort": "30132"
+        "remotePort": "30132",
+        "mergingMode": "delta"
       }
     },
 ```
-List the local processing machines in the `localMachines` array. `remoteMachine` should contain the host name which will serve as a QC server and `remotePort` should be a port number on which Mergers will wait for upcoming MOs. Make sure it is not used by other service. If different QC Tasks are run in parallel, use separate ports for each.
+List the local processing machines in the `localMachines` array. `remoteMachine` should contain the host name which
+ will serve as a QC server and `remotePort` should be a port number on which Mergers will wait for upcoming MOs. Make
+ sure it is not used by other service. If different QC Tasks are run in parallel, use separate ports for each. One
+ also may choose the merging mode - `delta` is the default and recommended (tasks are reset after each cycle, so they
+ send only updates), but if it is not feasible, Mergers may expect `entire` objects - tasks are not reset, they
+ always send entire objects and the latest versions are combined in Mergers.
 
 In case of a remote task, choosing `"remote"` option for the `"location"` parameter is enough.
 
@@ -329,6 +341,105 @@ To do so, one can use one of the two following methods.
   
   Currently supported by QCG: logx, logy, logz, gridx, gridy, gridz.
 
+## QC with DPL Analysis
+
+It is possible to attach QC to the Run 3 Analysis Tasks, as they use Data Processing Layer, just as
+QC. AOD tables can be requested as direct data sources and then read by a QC task with
+TableConsumer. One can also request AOD tables directly from an AOD file.
+
+In this piece of documentation it is assumed that the users already have some idea about QC and 
+[DPL Analysis](https://aliceo2group.github.io/analysis-framework), and
+ they have an access to AOD files following the Run 3 data model.
+
+### Getting AODs directly
+
+First, let's see how to get data directly from an AOD file. To read the table, we will use TableConsumer from DPL, as in [the example of a QC analysis
+task](../Modules/Example/src/AnalysisTask.cxx):
+```
+void AnalysisTask::monitorData(o2::framework::ProcessingContext& ctx)
+{
+  auto s = ctx.inputs().get<framework::TableConsumer>("aod-data");
+  auto table = s->asArrowTable();
+  ...
+}
+```
+In [our QC configuration file](../Modules/Example/etc/analysisDirect.json) we will request AOD data as a direct source
+, just as normal Analysis Tasks do:
+```
+    "tasks": {
+      "AnalysisQcTask": {
+        "active": "true",
+        "className": "o2::quality_control_modules::example::AnalysisTask",
+        "moduleName": "QcExample",
+        "detectorName": "TST",
+        "cycleDurationSeconds": "10",
+        "maxNumberCycles": "-1",
+        "dataSource": {
+          "type": "direct",
+          "query": "aod-data:AOD/TRACK:PAR/0"
+        },
+        "location": "remote"
+      }
+    },
+```
+Then we can run the processing with the following command:
+```
+o2-qc --config json://${QUALITYCONTROL_ROOT}/etc/analysisDirect.json -b --aod-file AO2D.root
+```
+
+### Merging with other analysis workflows
+
+Now, let's try to subscribe to data generated in another analysis workflow - 
+[`o2-analysistutorial-tracks-combinations`](https://github.com/AliceO2Group/AliceO2/tree/dev/Analysis/Tutorials/src/tracksCombinations.cxx),
+which produces a new table with hash numbers generated out of tracks in AODs:
+```
+...
+DECLARE_SOA_TABLE(Hashes, "AOD", "HASH", hash::Bin);  
+...
+```
+Thus, in [our QC config file](../Modules/Example/etc/analysisDerived.json) we should query data described as `AOD/HASH/0`:
+```
+    "tasks": {
+      "AnalysisQcTask": {
+        "active": "true",
+        "className": "o2::quality_control_modules::example::AnalysisTask",
+        "moduleName": "QcExample",
+        "detectorName": "TST",
+        "cycleDurationSeconds": "10",
+        "maxNumberCycles": "-1",
+        "dataSource": {
+          "type": "direct",
+          "query": "aod-data:AOD/HASH/0"
+        },
+        "location": "remote"
+      }
+    },
+```
+
+Finally, we can run the example by merging the two workflows. Remember to specify the AOD file path in both workflows
+, even if QC does need data directly from the file.
+```
+o2-analysistutorial-tracks-combinations --aod-file AO2D.root  -b | \
+  o2-qc --config json://${QUALITYCONTROL_ROOT}/etc/analysisDerived.json -b --aod-file AO2D.root
+```
+
+### Enabling a workflow to run on Hyperloop
+
+Hyperloop requires a workflow JSON dump in order to run it on Grid. To generate such a dump, in CMakeLists.txt of a
+ detector libraryone should use `configure_file` to install the configuration files, then `o2_add_qc_workflow` to
+ declare a QC analysis workflow. The first argument is an arbitrary workflow name, the second is the configuration
+ file path in the installation directory. For example:
+
+```
+configure_file("etc/analysisDirect.json" "${CMAKE_INSTALL_PREFIX}/etc/analysisDirect.json")
+configure_file("etc/analysisDerived.json" "${CMAKE_INSTALL_PREFIX}/etc/analysisDerived.json")
+
+# ---- Workflows for analysis ----
+
+o2_add_qc_workflow(WORKFLOW_NAME o2-qc-example-analysis-direct CONFIG_FILE_PATH ${CMAKE_INSTALL_PREFIX}/etc/analysisDirect.json)
+o2_add_qc_workflow(WORKFLOW_NAME o2-qc-example-analysis-derived CONFIG_FILE_PATH ${CMAKE_INSTALL_PREFIX}/etc/analysisDerived.json)
+```
+
 ## Data Inspector
 
 This is a GUI to inspect the data coming out of the DataSampling, in
@@ -351,8 +462,16 @@ the Data Sampling and the Data Inspector.
 
 First make sure that the Data Sampling is enabled in the readout :
 ```
-[consumer-data-sampling]
-consumerType=DataSampling
+[consumer-fmq-qc]
+consumerType=FairMQChannel
+enableRawFormat=1
+fmq-name=readout-qc
+fmq-address=ipc:///tmp/readout-pipe-1
+fmq-type=pub
+fmq-transport=zeromq
+unmanagedMemorySize=2G
+memoryPoolNumberOfPages=500
+memoryPoolPageSize=1M
 enabled=1
 ```
 
@@ -422,6 +541,9 @@ To install and run the QCG locally, and its fellow process tobject2json, please 
 
 ## Developing QC modules on a machine with FLP suite
 
+Option 1: Rebuild everything locally and use the QC module library that is generated
+
+Simply build as you would do on your development machine with aliBuild. 
 To load a development library in a setup with FLP suite, specify its full
 path in the config file (e.g. `/etc/flp.d/qc/readout.json`):
 ```
@@ -437,7 +559,19 @@ Make sure that:
 workflow specification for AliECS
 - The library is compiled with the same QC, O2, ROOT and GCC version as the 
 ones which are installed with the FLP suite. Especially, the task and check
-interfaces have to be identical.
+interfaces have to be identical. A good way to achieve that is to use the alidist branch matching the version of flp suite (e.g. `flp-suite-v0.12.0`).
+
+Option 2: Build on your development setup and scp the library
+
+1. Switch alidist to the branch corresponding to the flp-suite you installed, e.g. `flp-suite-v0.12.0`. 
+2. Rebuild QC using alibuild
+3. Backup the library (/opt/alisw/el7/QualityControl/<version>/lib)
+3. scp from development setup alice/sw/slc7_x86-64/QualityControl/latest/lib/yourlib* to /opt/alisw/el7/QualityControl/<version>/lib on the FLP.
+4. Rebuild the aliECS environment. 
+
+Option 3: Rebuild only the QC reusing the installed software
+
+NOT WORKING YET
 
 ## Use MySQL as QC backend
 
@@ -576,7 +710,8 @@ Below the full QC Task configuration structure is described. Note that more than
           "o2flp2",                         "", "Hostname of a local machine."
         ],
         "remoteMachine": "o2qc1",           "": "Remote QC machine hostname. Required ony for multi-node setups.",
-        "remotePort": "30432",              "": "Remote QC machine TCP port. Required ony for multi-node setups."
+        "remotePort": "30432",              "": "Remote QC machine TCP port. Required ony for multi-node setups.",
+        "mergingMode": "delta",             "": "Merging mode, \"delta\" (default) or \"entire\" objects are expected"
       }
     }
   }
@@ -600,14 +735,43 @@ Below the full QC Checks configuration structure is described. Note that more th
         "policy": "OnAny",            "": ["Policy which determines when MOs should be checked. See the documentation",
                                            "of Checks for the list of available policies and their behaviour."],
         "dataSource": [{              "": "List of data source of the Check.",
-          "type": "Task",             "": "Type of the data source, only \"Task\" up to this date", 
+          "type": "Task",             "": "Type of the data source, \"Task\", \"ExternalTask\" or \"PostProcessing\"", 
           "name": "myTask_1",         "": "Name of the Task",
-          "MOs": [ "example" ],       "": ["List of MOs to be checked. Use \"all\" (not as a list) to check each MO ",
-                                           "which is produced by the Task"]
+          "MOs": [ "example" ],       "": ["List of MOs to be checked. "
+                                            "Can be omitted to mean \"all\"."]
         }],
         "checkParameters": {          "": "User Check parameters which are then accessible as a key-value map.",
           "myOwnKey": "myOwnValue",   "": "An example of a key and a value. Nested structures are not supported"
         }
+      }
+    }
+  }
+}
+```
+
+### QC Aggregators configuration
+
+Below the full QC Aggregators configuration structure is described. Note that more than one aggregator might be declared inside in
+ the "aggregators" path. Please also refer to [the Aggregators documentation](doc/ModulesDevelopment.md#quality-aggregation) for more details.
+
+```json
+{
+  "qc": {
+    "aggregators": {
+      "MyAggregator1": {              "": "Name of the Aggregator. Less than 12 character names are preferred.",
+        "active": "true",             "": "Activation flag. If not \"true\", the Aggregator will not be run.",
+        "className": "ns::of::Aggregator", "": "Class name of the QC Aggregator with full namespace.",
+        "moduleName": "QcCommon",     "": "Library name. It can be found in CMakeLists of the detector module.",
+        "policy": "OnAny",            "": ["Policy which determines when QOs should be aggregated. See the documentation",
+                                           "of Aggregators for the list of available policies and their behaviour."],
+        "detectorName": "TST",        "": "3-letter code of the detector.",
+        "dataSource": [{              "": "List of data source of the Aggregator.",
+          "type": "Check",,           "": "Type of the data source: \"Check\" or \"Aggregator\"", 
+          "name": "dataSizeCheck",    "": "Name of the Check or Aggregator",
+          "QOs": ["newQuality", "another"], "": ["List of QOs to be checked.",
+                                          "Can be omitted for Checks", 
+                                          "that publish a single Quality or to mean \"all\"."]
+        }]
       }
     }
   }

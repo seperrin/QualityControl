@@ -18,27 +18,27 @@ namespace quality_control_modules
 namespace muonchambers
 {
 
-class GlobalHistogram: public TH2F
+class GlobalHistogram : public TH2F
 {
   int getLR(int de);
   void getDeCenter(int de, float& xB0, float& yB0, float& xNB0, float& yNB0);
   void getDeCenterST3(int de, float& xB0, float& yB0, float& xNB0, float& yNB0);
   void getDeCenterST4(int de, float& xB0, float& yB0, float& xNB0, float& yNB0);
   void getDeCenterST5(int de, float& xB0, float& yB0, float& xNB0, float& yNB0);
-  
-public:
+
+ public:
   GlobalHistogram(std::string name, std::string title);
-  
+
   void init();
 
   // add the histograms of the individual detection elements
   void add(std::map<int, TH2F*>& histB, std::map<int, TH2F*>& histNB);
-    
+
   // replace the contents with the histograms of the individual detection elements, including null bins
   void set_includeNull(std::map<int, TH2F*>& histB, std::map<int, TH2F*>& histNB);
 
   // replace the contents with the histograms of the individual detection elements
-  void set(std::map<int, TH2F*>& histB, std::map<int, TH2F*>& histNB, bool doAverage=true, bool includeNullBins=false);
+  void set(std::map<int, TH2F*>& histB, std::map<int, TH2F*>& histNB, bool doAverage = true, bool includeNullBins = false);
 };
 
 } // namespace muonchambers

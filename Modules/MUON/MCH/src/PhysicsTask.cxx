@@ -400,7 +400,7 @@ void PhysicsTask::monitorDataDigits(o2::framework::ProcessingContext& ctx)
                 }
                 lastorbitseen[fee][li] = orbitnumber;
                 if (mPrintLevel >= 0) {
-                    std::cout<< "Number of orbits of Link " << fee << "," << li << " is set to " << norbits[fee][link] <<std::endl;
+                    std::cout<< "Number of orbits of Link " << fee << "," << li << " is set to " << norbits[fee][li] <<std::endl;
                 }
             }
         }
@@ -457,7 +457,6 @@ void PhysicsTask::monitorData(o2::framework::ProcessingContext& ctx)
   }
   //monitorDataReadout(ctx);
   bool digitsFound = false;
-  bool orbitsFound = false;
   bool preclustersFound = false;
   bool preclusterDigitsFound = false;
   for (auto&& input : ctx.inputs()) {
@@ -466,9 +465,6 @@ void PhysicsTask::monitorData(o2::framework::ProcessingContext& ctx)
     }
     if (input.spec->binding == "digits") {
       digitsFound = true;
-    }
-    if (input.spec->binding == "orbits") {
-      orbitsFound = true;
     }
     if (input.spec->binding == "preclusters") {
       preclustersFound = true;
@@ -610,12 +606,12 @@ void PhysicsTask::plotDigit(const o2::mch::Digit& digit)
             uint32_t ds_addr_boucle = 0;
             int32_t cruid_boucle = 0;
             int32_t linkid_boucle = 0;
-            int32_t fee_id_boucle = 0;
+            //int32_t fee_id_boucle = 0;
 
             if(segment.findPadPairByPosition(x, y, bpad, nbpad)){
               //  std::cout << "Pad position x : " << x << " y : " << y << " has bpad : " << bpad << std::endl;
               int dsid_boucle = segment.padDualSampaId(bpad);
-              int chan_addr_boucle = segment.padDualSampaChannel(bpad);
+              //int chan_addr_boucle = segment.padDualSampaChannel(bpad);
               solar_id_boucle = mDecoder.getMapFECinv(de, dsid_boucle, solar_id_boucle, ds_addr_boucle);
               // std::cout << "solar_id_boucle = " << solar_id_boucle << std::endl;
               if(solar_id_boucle == solar_id){
@@ -625,9 +621,9 @@ void PhysicsTask::plotDigit(const o2::mch::Digit& digit)
                   std::cout << "Problem getMapCRUInv !!!!!!!!!!!!!" << std::endl;
                 }
                 if(mDecoder.getMapCRUInv(solar_id_boucle, cruid_boucle, linkid_boucle)){
-                  fee_id_boucle = cruid_boucle * 2 + (linkid_boucle / 12);
-                  int xbin = fee_id_boucle * 12 * 40 + (linkid_boucle % 12) * 40 + ds_addr_boucle + 1;
-                  int ybin = chan_addr_boucle + 1;
+                  //fee_id_boucle = cruid_boucle * 2 + (linkid_boucle / 12);
+                  //int xbin = fee_id_boucle * 12 * 40 + (linkid_boucle % 12) * 40 + ds_addr_boucle + 1;
+                  //int ybin = chan_addr_boucle + 1;
                   //                               int binxy_boucle = mHistogramNorbitsElec->GetBin(xbin, ybin, 1);
                   //                               int x_center_boucle = mHistogramNorbitsElec->GetXaxis()->GetBinCenter(xbin);
                   //                               int y_center_boucle = mHistogramNorbitsElec->GetXaxis()->GetBinCenter(ybin);
@@ -693,7 +689,7 @@ static void CoG(gsl::span<const o2::mch::Digit> precluster, double& Xcog, double
   int detid = precluster[0].getDetID();
   const o2::mch::mapping::Segmentation& segment = o2::mch::mapping::segmentation(detid);
 
-  for ( size_t i = 0; i < precluster.size(); ++i ) {
+  for ( ssize_t i = 0; i < precluster.size(); ++i ) {
     const o2::mch::Digit& digit = precluster[i];
     int padid = digit.getPadID();
 
@@ -787,7 +783,7 @@ void PhysicsTask::checkPreclusters(gsl::span<const o2::mch::PreCluster> preClust
       int detid = preClusterDigits[0].getDetID();
       const o2::mch::mapping::Segmentation& segment = o2::mch::mapping::segmentation(detid);
 
-      for ( size_t i = 0; i < preClusterDigits.size(); ++i ) {
+      for ( ssize_t i = 0; i < preClusterDigits.size(); ++i ) {
         const o2::mch::Digit& digit = preClusterDigits[i];
         int padid = digit.getPadID();
 
@@ -845,20 +841,20 @@ void PhysicsTask::printPreclusters(gsl::span<const o2::mch::PreCluster> preClust
     // get the digits of this precluster
     auto preClusterDigits = digits.subspan(preCluster.firstDigit, preCluster.nDigits);
 
-    bool cathode[2] = {false, false};
+    //bool cathode[2] = {false, false};
     float chargeSum[2] = {0, 0};
     float chargeMax[2] = {0, 0};
 
     int detid = preClusterDigits[0].getDetID();
     const o2::mch::mapping::Segmentation& segment = o2::mch::mapping::segmentation(detid);
 
-    for ( size_t i = 0; i < preClusterDigits.size(); ++i ) {
+    for ( ssize_t i = 0; i < preClusterDigits.size(); ++i ) {
       const o2::mch::Digit& digit = preClusterDigits[i];
       int padid = digit.getPadID();
 
       // cathode index
       int cid = segment.isBendingPad(padid) ? 0 : 1;
-      cathode[cid] = true;
+      //cathode[cid] = true;
       chargeSum[cid] += digit.getADC();
 
       if (digit.getADC() > chargeMax[cid]) {
@@ -897,7 +893,7 @@ bool PhysicsTask::plotPrecluster(const o2::mch::PreCluster& preCluster, gsl::spa
   int detid = preClusterDigits[0].getDetID();
   const o2::mch::mapping::Segmentation& segment = o2::mch::mapping::segmentation(detid);
 
-  for ( size_t i = 0; i < preClusterDigits.size(); ++i ) {
+  for ( ssize_t i = 0; i < preClusterDigits.size(); ++i ) {
     const o2::mch::Digit& digit = preClusterDigits[i];
     int padid = digit.getPadID();
 
@@ -967,7 +963,7 @@ bool PhysicsTask::plotPrecluster(const o2::mch::PreCluster& preCluster, gsl::spa
       }
     }
 
-  int hid = 1;
+  //int hid = 1;
   if(cathode[0] && isWide[0]) {
     auto hXY1 = mHistogramPreclustersXY[1].find(detid);
     if ((hXY1 != mHistogramPreclustersXY[1].end()) && (hXY1->second != NULL)) {
@@ -1247,7 +1243,7 @@ void PhysicsTask::endOfCycle()
             uint32_t ds_addr =  (binx-1) % 40;
             uint32_t linkid = ( (binx-1-ds_addr) / 40 ) % 12;
             uint32_t fee_id = (binx-1-ds_addr-40*linkid) / (12*40);
-            uint32_t chan_addr = biny-1;
+            //uint32_t chan_addr = biny-1;
             uint32_t de;
             uint32_t dsid;
             uint32_t cru_id = fee_id / 2;
@@ -1296,7 +1292,7 @@ void PhysicsTask::endOfCycle()
                   uint32_t ds_addr =  (binx-1) % 40;
                   uint32_t linkid = ( (binx-1-ds_addr) / 40 ) % 12;
                   uint32_t fee_id = (binx-1-ds_addr-40*linkid) / (12*40);
-                  uint32_t chan_addr = biny-1;
+                  //uint32_t chan_addr = biny-1;
                   uint32_t de;
                   uint32_t dsid;
                   uint32_t cru_id = fee_id / 2;
