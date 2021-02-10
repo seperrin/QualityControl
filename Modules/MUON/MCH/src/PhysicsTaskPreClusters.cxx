@@ -62,7 +62,7 @@ namespace quality_control_modules
 {
 namespace muonchambers
 {
-PhysicsTaskPreClusters::PhysicsTaskPreClusters() : TaskInterface(), count(1) {}
+PhysicsTaskPreClusters::PhysicsTaskPreClusters() : TaskInterface() {}
 
 PhysicsTaskPreClusters::~PhysicsTaskPreClusters() { fclose(flog); }
 
