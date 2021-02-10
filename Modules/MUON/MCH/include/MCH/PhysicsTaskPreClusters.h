@@ -55,13 +55,13 @@ class PhysicsTaskPreClusters /*final*/ : public TaskInterface // todo add back t
   void printPreclusters(gsl::span<const o2::mch::PreCluster> preClusters, gsl::span<const o2::mch::Digit> digits);
 
  private:
-  int count;
+//  int count;
   Decoder mDecoder;
-  uint64_t nhits[24][40][64];
+  //uint64_t nhits[24][40][64];
 
   std::vector<std::unique_ptr<mch::Digit>> digits;
-  mch::Digit* digitsBuffer;
-  int nDigits;
+// mch::Digit* digitsBuffer;
+  //int nDigits;
     std::vector<int> DEs;
 
   std::map<int, TH1F*> mHistogramClchgDE;

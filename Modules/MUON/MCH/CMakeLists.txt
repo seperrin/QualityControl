@@ -32,6 +32,7 @@ set(HEADERS
   include/MCH/TH1MCHReductor.h
   include/MCH/TH2MCHReductor.h
   include/MCH/GlobalHistogramReductor.h
+  include/MCH/CustomMergeableTH2Quotient.h
 )
 
 # ---- Library ----
@@ -45,7 +46,7 @@ target_include_directories(
 )
 
 target_link_libraries(${MODULE_NAME} PUBLIC QualityControl O2::CommonDataFormat O2::GPUCommon 
-        $<TARGET_NAME_IF_EXISTS:O2::MCHMappingFactory> O2::MCHMappingImpl3 O2::MCHMappingSegContour O2::MCHRawDecoder O2::MCHPreClustering)
+        $<TARGET_NAME_IF_EXISTS:O2::MCHMappingFactory> O2::MCHMappingImpl3 O2::MCHMappingSegContour O2::MCHRawDecoder O2::MCHPreClustering O2::Mergers)
 
 target_compile_definitions(${MODULE_NAME} PRIVATE $<$<TARGET_EXISTS:O2::MCHMappingFactory>:MCH_HAS_MAPPING_FACTORY>)
 
@@ -73,7 +74,29 @@ add_root_dictionary(${MODULE_NAME}
                             include/MCH/TH1MCHReductor.h
                             include/MCH/TH2MCHReductor.h
                             include/MCH/GlobalHistogramReductor.h
+                            include/MCH/CustomMergeableTH2Quotient.h
                     LINKDEF include/MCH/LinkDef.h)
+                    
+# ---- Executables ----
+
+set(EXE_SRCS
+     src/TestMerging.cxx)
+set(EXE_NAMES
+     o2-qc-run-test-merging)
+
+list(LENGTH EXE_SRCS count)
+math(EXPR count "${count}-1")
+foreach(i RANGE ${count})
+  list(GET EXE_SRCS ${i} src)
+  list(GET EXE_NAMES ${i} name)
+  add_executable(${name} ${src})
+  target_link_libraries(${name} PRIVATE QualityControl QcMuonChambers)
+endforeach()
+
+install(
+  TARGETS o2-qc-run-test-merging
+  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
 
 # ---- Tests ----
 

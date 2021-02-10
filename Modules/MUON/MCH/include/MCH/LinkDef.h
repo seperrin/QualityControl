@@ -15,5 +15,6 @@
 #pragma link C++ class o2::quality_control_modules::muonchambers::TH1MCHReductor + ;
 #pragma link C++ class o2::quality_control_modules::muonchambers::TH2MCHReductor + ;
 #pragma link C++ class o2::quality_control_modules::muonchambers::GlobalHistogramReductor + ;
+#pragma link C++ class o2::quality_control_modules::muonchambers::CustomMergeableTH2Quotient + ;
 
 #endif
